@@ -14,6 +14,14 @@ ifeq ($(OS), Windows_NT)
     CLEAN_OBJS = $(subst /,\,$(OBJS))
     RUN_CMD = $(TARGET)
     EXT = .exe
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S), Linux)
+        LIBS = -lSDL2main -lSDL2
+        RM = rm -rf
+        CLEAN_OBJS = $(OBJS)
+        RUN_CMD = ./$(TARGET)
+    endif
 endif
 
 
