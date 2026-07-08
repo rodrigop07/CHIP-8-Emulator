@@ -527,9 +527,3 @@ class Chip8{
             return false;
         }
 };
-
-int main(){
-    Chip8 chip8;
-
-    return 0;
-}
