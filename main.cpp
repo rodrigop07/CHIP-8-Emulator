@@ -5,7 +5,7 @@
 int main(int argc, char* args[]){
     // initialize chip-8 emulator
     Chip8 chip8;
-    if(!chip8.loadROM("Airplane.ch8")){
+    if(!chip8.loadROM("roms/Pong.ch8")){
         std::cerr << "Failed to load ROM" << std::endl;
         return -1;
     }
@@ -21,8 +21,8 @@ int main(int argc, char* args[]){
         "Chip-8 Emulator", // title
         SDL_WINDOWPOS_CENTERED, // x position
         SDL_WINDOWPOS_CENTERED, // y position
-        640, // width
-        320, // height
+        960, // width
+        480, // height
         SDL_WINDOW_SHOWN
     );
 
@@ -66,13 +66,70 @@ int main(int argc, char* args[]){
 
     while(isRunning){
         while(SDL_PollEvent(&event) != 0){
+            // check if the event is a quit event (closing the window)
             if(event.type == SDL_QUIT){
                 isRunning = false;
+            }else if(event.type == SDL_KEYDOWN){
+                // map keyboard inputs to chip-8 keyboard
+                switch(event.key.keysym.sym){
+                    case SDLK_x: 
+                        std::cout << "KEY PRESSED: " << event.key.keysym.sym << std::endl; 
+                        chip8.keyboard[0] = 1; 
+                        break;
+                    case SDLK_1: chip8.keyboard[1] = 1; break;
+                    case SDLK_2: chip8.keyboard[2] = 1; break;
+                    case SDLK_3: chip8.keyboard[3] = 1; break;
+                    case SDLK_q: chip8.keyboard[4] = 1; break;
+                    case SDLK_w: chip8.keyboard[5] = 1; break;
+                    case SDLK_e: chip8.keyboard[6] = 1; break;
+                    case SDLK_a: chip8.keyboard[7] = 1; break;
+                    case SDLK_s: chip8.keyboard[8] = 1; break;
+                    case SDLK_d: chip8.keyboard[9] = 1; break;
+                    case SDLK_z: chip8.keyboard[0xA] = 1; break;
+                    case SDLK_c: chip8.keyboard[0xB] = 1; break;
+                    case SDLK_4: chip8.keyboard[0xC] = 1; break;
+                    case SDLK_r: chip8.keyboard[0xD] = 1; break;
+                    case SDLK_f: chip8.keyboard[0xE] = 1; break;
+                    case SDLK_v: chip8.keyboard[0xF] = 1; break;
+                }
+            }else if(event.type == SDL_KEYUP){
+                switch(event.key.keysym.sym){
+                    case SDLK_x: 
+                        std::cout << "KEY RELEASED: " << event.key.keysym.sym << std::endl; 
+                        chip8.keyboard[0] = 0; 
+                        break;
+                    case SDLK_1: chip8.keyboard[1] = 0; break;
+                    case SDLK_2: chip8.keyboard[2] = 0; break;
+                    case SDLK_3: chip8.keyboard[3] = 0; break;
+                    case SDLK_q: chip8.keyboard[4] = 0; break;
+                    case SDLK_w: chip8.keyboard[5] = 0; break;
+                    case SDLK_e: chip8.keyboard[6] = 0; break;
+                    case SDLK_a: chip8.keyboard[7] = 0; break;
+                    case SDLK_s: chip8.keyboard[8] = 0; break;
+                    case SDLK_d: chip8.keyboard[9] = 0; break;
+                    case SDLK_z: chip8.keyboard[0xA] = 0; break;
+                    case SDLK_c: chip8.keyboard[0xB] = 0; break;
+                    case SDLK_4: chip8.keyboard[0xC] = 0; break;
+                    case SDLK_r: chip8.keyboard[0xD] = 0; break;
+                    case SDLK_f: chip8.keyboard[0xE] = 0; break;
+                    case SDLK_v: chip8.keyboard[0xF] = 0; break;
+                }
             }
         }
 
-        // emulate the cpu cycle
-        chip8.cycle();
+        // emulate the cpu clock at 60hz
+        for(int i = 0; i < 12; i++){
+            chip8.cycle();
+        }
+
+        // decrement timers at 60Hz
+        if(chip8.delay_timer > 0){
+            chip8.delay_timer--;
+        }
+        if(chip8.sound_timer > 0){
+            chip8.sound_timer--;
+        }
+
         // transform the chip-8 display into 32-bits colors
         for(int i = 0; i < 64 * 32; i++){
             if(chip8.display[i] == 1){

@@ -72,15 +72,25 @@ class Chip8{
 
             // decode
             switch(opcode & 0xF000){
-                case 0x00E0: // 0x00E0: CLS - Clear the display
-                    // clear the display array
-                    std::memset(display, 0, sizeof(display));
-                    pc += 2;
-                    break;
+                case 0x0000:
+                    switch(opcode & 0x00FF){
+                        case 0xE0: // 0x00E0: CLS - Clear the display
+                            // clear the display array
+                            std::memset(display, 0, sizeof(display));
+                            pc += 2;
+                            break;
+        
+                        case 0xEE: // 0x00EE: RET - Return from a subroutine
+                            // point pc to the address on top of the stack then subtracts 1 from the stack pointer
+                            pc = stack[sp];
+                            sp--;
+                            pc += 2;
+                            break;
 
-                case 0x00EE: // 0x00EE: RET - Return from a subroutine
-                    // point pc to the address on top of the stack then subtracts 1 from the stack pointer
-                    pc = stack[sp--];
+                        default:
+                            pc += 2;
+                            break;
+                    }
                     break;
 
                 case 0x1000: // 0x1NNN: JP addr - jump to address NNN
@@ -90,7 +100,8 @@ class Chip8{
 
                 case 0x2000: // 0x2NNN: CALL addr - call subroutine at NNN
                     // increment stack pointer and add pc to the stack
-                    stack[++sp] = pc;
+                    sp++;
+                    stack[sp] = pc;
                     // set pc to the address NNN
                     pc = opcode & 0x0FFF;
                     break;
@@ -228,7 +239,7 @@ class Chip8{
                             // isolate y bits
                             unsigned int y = (opcode >> 4) & 0x0F;
                             // set VF = NOT borrow
-                            if(V[x] > V[y]){
+                            if(V[x] >= V[y]){
                                 V[0xF] = 1;
                             }else{
                                 V[0xF] = 0;
@@ -256,7 +267,7 @@ class Chip8{
                             // isolate y bits
                             unsigned int y = (opcode >> 4) & 0x0F;
                             // set VF = NOT borrow
-                            if(V[y] > V[x]){
+                            if(V[y] >= V[x]){
                                 V[0xF] = 1;
                             }else{
                                 V[0xF] = 0;
@@ -424,7 +435,7 @@ class Chip8{
                             }
                             // if no key is pressed, stay on same instruction
                             if(!keyPressed){
-                                return; 
+                              return; 
                             }
                             pc += 2;
                             break;
