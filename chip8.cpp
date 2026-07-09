@@ -64,6 +64,19 @@ class Chip8{
             }
         }
 
+        void reset(){
+            pc = 0x200;
+            I = 0;
+            sp = 0;
+            delay_timer = 0;
+            sound_timer = 0;
+
+            std::memset(V, 0, sizeof(V));
+            std::memset(stack, 0, sizeof(stack));
+            std::memset(display, 0, sizeof(display));
+            std::memset(keyboard, 0, sizeof(keyboard));
+        }
+
         // emulates the cpu cycle
         void cycle(){
             // fetch
@@ -517,7 +530,7 @@ class Chip8{
         }
 
         // loads ROM to memory
-        bool loadROM(const char* fileName){
+        bool loadROM(const std::string& fileName){
             // opens file in binary mode and place a pointer at the end
             std::ifstream file(fileName, std::ios::binary | std::ios::ate);
             if(file.is_open()){

@@ -1,14 +1,38 @@
 #include "chip8.cpp"
 #include <iostream>
+#include <string>
+#include <vector>
+#include <filesystem>
 #include <SDL2/SDL.h>
+
+namespace fs = std::filesystem;
+
+void chooseROM(Chip8& chip8){
+    std::vector<std::string> roms;
+    for(const auto &rom: fs::directory_iterator("./roms")){
+        if(fs::is_regular_file(rom.status())){
+            roms.push_back(rom.path().filename().string());
+        }
+    }
+    int opc = 0;
+    for(const auto &rom: roms){
+        std::cout << opc++ << " - " << rom << std::endl;
+    }
+    std::cout << "Select a ROM: ";
+    std::cin >> opc;
+    while(opc < 0 || opc >= (int)roms.size()){
+        std::cout << "Select a valid ROM: ";
+        std::cin >> opc;
+    }
+
+    chip8.reset();
+    chip8.loadROM(std::string("roms/" + roms[opc]));
+}
 
 int main(int argc, char* args[]){
     // initialize chip-8 emulator
     Chip8 chip8;
-    if(!chip8.loadROM("roms/Pong.ch8")){
-        std::cerr << "Failed to load ROM" << std::endl;
-        return -1;
-    }
+    chooseROM(chip8);
 
     // try to init video
     if(SDL_Init(SDL_INIT_VIDEO) < 0){
@@ -72,10 +96,7 @@ int main(int argc, char* args[]){
             }else if(event.type == SDL_KEYDOWN){
                 // map keyboard inputs to chip-8 keyboard
                 switch(event.key.keysym.sym){
-                    case SDLK_x: 
-                        std::cout << "KEY PRESSED: " << event.key.keysym.sym << std::endl; 
-                        chip8.keyboard[0] = 1; 
-                        break;
+                    case SDLK_x: chip8.keyboard[0] = 1; break;
                     case SDLK_1: chip8.keyboard[1] = 1; break;
                     case SDLK_2: chip8.keyboard[2] = 1; break;
                     case SDLK_3: chip8.keyboard[3] = 1; break;
@@ -91,13 +112,11 @@ int main(int argc, char* args[]){
                     case SDLK_r: chip8.keyboard[0xD] = 1; break;
                     case SDLK_f: chip8.keyboard[0xE] = 1; break;
                     case SDLK_v: chip8.keyboard[0xF] = 1; break;
+                    case SDLK_LCTRL: chooseROM(chip8); break;
                 }
             }else if(event.type == SDL_KEYUP){
                 switch(event.key.keysym.sym){
-                    case SDLK_x: 
-                        std::cout << "KEY RELEASED: " << event.key.keysym.sym << std::endl; 
-                        chip8.keyboard[0] = 0; 
-                        break;
+                    case SDLK_x: chip8.keyboard[0] = 0; break;
                     case SDLK_1: chip8.keyboard[1] = 0; break;
                     case SDLK_2: chip8.keyboard[2] = 0; break;
                     case SDLK_3: chip8.keyboard[3] = 0; break;
