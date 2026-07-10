@@ -4,6 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <filesystem>
+#include <atomic>
 #include <SDL2/SDL.h>
 
 namespace fs = std::filesystem;
@@ -13,6 +14,8 @@ const int SAMPLE_RATE = 44100;
 const int AMPLITUDE = 3000;
 const double PI = 3.1415;
 double audio_phase = 0.0;
+// flag to indicate if the chip-8 is beeping
+std::atomic<bool> is_beeping(false);
 
 // audio callback to generate the beep sound
 void audioCallback(void* userdata, Uint8* stream, int len){
@@ -20,17 +23,22 @@ void audioCallback(void* userdata, Uint8* stream, int len){
     int length = len / 2;
 
     for(int i = 0; i < length; i++){
-        if(std::sin(audio_phase) > 0.0){
-            buffer[i] = AMPLITUDE;
+        if(is_beeping){
+            if(std::sin(audio_phase) > 0.0){
+                buffer[i] = AMPLITUDE;
+            }else{
+                buffer[i] = -AMPLITUDE;
+            }
+            audio_phase += (2.0 * PI * 440.0) / SAMPLE_RATE;
+            if(audio_phase > 2.0 * PI){
+                audio_phase -= 2.0 * PI;
+            }
         }else{
-            buffer[i] = -AMPLITUDE;
+            buffer[i] = 0;
+            audio_phase = 0.0;
         }
     }
 
-    audio_phase += (2.0 * PI * 440.0) / SAMPLE_RATE;
-    if(audio_phase > 2.0 * PI){
-        audio_phase -= 2.0 * PI;
-    }
 }
 
 // menu to choose a rom
@@ -122,6 +130,8 @@ int main(int argc, char* args[]){
     SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
     if(audioDevice == 0){
         std::cerr << "Failed to open audio:  " << SDL_GetError() << std::endl;
+    }else{
+        SDL_PauseAudioDevice(audioDevice, 0);
     }
 
     // create buffer to copy the display array
@@ -179,21 +189,18 @@ int main(int argc, char* args[]){
         }
 
         // emulate the cpu clock at 60hz
-        for(int i = 0; i < 12; i++){
+        for(int i = 0; i < 10; i++){
             chip8.cycle();
         }
 
         // decrement timers at 60Hz
         if(chip8.delay_timer > 0){
             chip8.delay_timer--;
-        }
-        if(chip8.sound_timer > 0){
-            chip8.sound_timer--;
-            // unpause audio device
-            SDL_PauseAudioDevice(audioDevice, 0);
+            // send audio pulse
+            is_beeping = true;
         }else{
-            // pause audio device
-            SDL_PauseAudioDevice(audioDevice, 1);
+            // don't send audio pulse
+            is_beeping = false;
         }
 
         // transform the chip-8 display into 32-bits colors
