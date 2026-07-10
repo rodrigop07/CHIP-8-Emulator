@@ -2,11 +2,38 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 #include <filesystem>
 #include <SDL2/SDL.h>
 
 namespace fs = std::filesystem;
 
+// audio variables
+const int SAMPLE_RATE = 44100;
+const int AMPLITUDE = 3000;
+const double PI = 3.1415;
+double audio_phase = 0.0;
+
+// audio callback to generate the beep sound
+void audioCallback(void* userdata, Uint8* stream, int len){
+    int16_t* buffer = (int16_t*)stream;
+    int length = len / 2;
+
+    for(int i = 0; i < length; i++){
+        if(std::sin(audio_phase) > 0.0){
+            buffer[i] = AMPLITUDE;
+        }else{
+            buffer[i] = -AMPLITUDE;
+        }
+    }
+
+    audio_phase += (2.0 * PI * 440.0) / SAMPLE_RATE;
+    if(audio_phase > 2.0 * PI){
+        audio_phase -= 2.0 * PI;
+    }
+}
+
+// menu to choose a rom
 void chooseROM(Chip8& chip8){
     std::vector<std::string> roms;
     for(const auto &rom: fs::directory_iterator("./roms")){
@@ -35,7 +62,7 @@ int main(int argc, char* args[]){
     chooseROM(chip8);
 
     // try to init video
-    if(SDL_Init(SDL_INIT_VIDEO) < 0){
+    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0){
         std::cerr << "ERROR: " << SDL_GetError() << std::endl;
         return -1;
     }
@@ -80,6 +107,21 @@ int main(int argc, char* args[]){
         SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;
+    }
+
+    // initialize audio
+    SDL_AudioSpec want, have;
+    std::memset(&want, 0, sizeof(want));
+    want.freq = SAMPLE_RATE;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;
+    want.samples = 2048;
+    want.callback = audioCallback;
+
+    // open audio device
+    SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
+    if(audioDevice == 0){
+        std::cerr << "Failed to open audio:  " << SDL_GetError() << std::endl;
     }
 
     // create buffer to copy the display array
@@ -147,6 +189,11 @@ int main(int argc, char* args[]){
         }
         if(chip8.sound_timer > 0){
             chip8.sound_timer--;
+            // unpause audio device
+            SDL_PauseAudioDevice(audioDevice, 0);
+        }else{
+            // pause audio device
+            SDL_PauseAudioDevice(audioDevice, 1);
         }
 
         // transform the chip-8 display into 32-bits colors
@@ -172,6 +219,7 @@ int main(int argc, char* args[]){
     }
 
     // close the application
+    SDL_CloseAudioDevice(audioDevice);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
