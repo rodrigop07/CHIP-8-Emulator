@@ -22,6 +22,9 @@ class Chip8{
         // 
         uint8_t display[64 * 32]; // 64*32px monocromatic display
         uint8_t keyboard[16]; // 16 keys keyboard
+        //
+        bool draw_flag;
+        bool isInitialized;
 
         // constructor
         Chip8(){
@@ -30,6 +33,8 @@ class Chip8{
             sp = 0;
             delay_timer = 0;
             sound_timer = 0;
+            draw_flag = true;
+            isInitialized = false;
 
             // clear memory and arrays
             std::memset(memory, 0, sizeof(memory));
@@ -70,6 +75,7 @@ class Chip8{
             sp = 0;
             delay_timer = 0;
             sound_timer = 0;
+            isInitialized = false;
 
             std::memset(V, 0, sizeof(V));
             std::memset(stack, 0, sizeof(stack));
@@ -90,6 +96,8 @@ class Chip8{
                         case 0xE0: // 0x00E0: CLS - Clear the display
                             // clear the display array
                             std::memset(display, 0, sizeof(display));
+                            // set draw flag
+                            draw_flag = true;
                             pc += 2;
                             break;
         
@@ -393,6 +401,7 @@ class Chip8{
                             }
                         }
                     }
+                    draw_flag = true;
                     pc += 2;
                     break;
                 }
@@ -546,6 +555,7 @@ class Chip8{
                     }
                 }
                 file.close();
+                isInitialized = true;
                 return true;
             }
             return false;

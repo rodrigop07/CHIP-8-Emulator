@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <atomic>
 #include <SDL2/SDL.h>
+#include "../headers/tinyfiledialogs.h"
 
 namespace fs = std::filesystem;
 
@@ -42,7 +43,35 @@ void audioCallback(void* userdata, Uint8* stream, int len){
 }
 
 // menu to choose a rom
-void chooseROM(Chip8& chip8){
+int chooseROM(Chip8& chip8){
+    // type of files to show
+    char const *filters[1] = {"*.ch8"};
+    // open OS window to choose a rom
+    char const *ROMPath = tinyfd_openFileDialog(
+        "Select a ROM", // window title
+        "./roms", // directory to start
+        1, // number of filters
+        filters, // array of filters
+        "Chip-8 ROMs", // description
+        0 // multiselect off
+    );
+
+    if(ROMPath == nullptr){
+        if(chip8.isInitialized){
+            return 1;
+        }else{
+            return 0;
+        }
+    } 
+
+    chip8.reset();
+    if(!chip8.loadROM(ROMPath)){
+        return 0;
+    }
+
+    return 1;
+
+    /*
     std::vector<std::string> roms;
     for(const auto &rom: fs::directory_iterator("./roms")){
         if(fs::is_regular_file(rom.status())){
@@ -59,22 +88,20 @@ void chooseROM(Chip8& chip8){
         std::cout << "Select a valid ROM: ";
         std::cin >> opc;
     }
-
+    
     chip8.reset();
     chip8.loadROM(std::string("roms/" + roms[opc]));
+    */
 }
 
 int main(int argc, char* args[]){
-    // initialize chip-8 emulator
-    Chip8 chip8;
-    chooseROM(chip8);
-
+    
     // try to init video
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0){
         std::cerr << "ERROR: " << SDL_GetError() << std::endl;
         return -1;
     }
-
+    
     // create sdl window
     SDL_Window* window = SDL_CreateWindow(
         "Chip-8 Emulator", // title
@@ -84,23 +111,23 @@ int main(int argc, char* args[]){
         480, // height
         SDL_WINDOW_SHOWN
     );
-
+    
     if(window == nullptr){
         std::cerr << "ERROR: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return -1;
     }
-
+    
     // init renderer
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
+    
     if(renderer == nullptr){
         std::cerr << "ERROR: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;
     }
-
+    
     // create sdl texture
     SDL_Texture* texture = SDL_CreateTexture(
         renderer, 
@@ -109,14 +136,14 @@ int main(int argc, char* args[]){
         64,
         32
     );
-
+    
     if(texture == nullptr){
         std::cerr << "ERROR: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;
     }
-
+    
     // initialize audio
     SDL_AudioSpec want, have;
     std::memset(&want, 0, sizeof(want));
@@ -125,7 +152,7 @@ int main(int argc, char* args[]){
     want.channels = 1;
     want.samples = 2048;
     want.callback = audioCallback;
-
+    
     // open audio device
     SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
     if(audioDevice == 0){
@@ -133,13 +160,23 @@ int main(int argc, char* args[]){
     }else{
         SDL_PauseAudioDevice(audioDevice, 0);
     }
-
+    
     // create buffer to copy the display array
     uint32_t pixels[64 * 32];
     // main event loop
     bool isRunning = true;
     SDL_Event event;
-
+    
+    // present the renderer at the start
+    SDL_RenderPresent(renderer);
+    
+    // initialize chip-8 emulator
+    Chip8 chip8;
+    if(!chooseROM(chip8)){
+        std::cout << "No ROM selected!" << std::endl;
+        return -1;
+    }
+    
     while(isRunning){
         while(SDL_PollEvent(&event) != 0){
             // check if the event is a quit event (closing the window)
@@ -189,7 +226,7 @@ int main(int argc, char* args[]){
         }
 
         // emulate the cpu clock at 60hz
-        for(int i = 0; i < 10; i++){
+        for(int i = 0; i < 15; i++){
             chip8.cycle();
         }
 
@@ -203,26 +240,29 @@ int main(int argc, char* args[]){
             is_beeping = false;
         }
 
-        // transform the chip-8 display into 32-bits colors
-        for(int i = 0; i < 64 * 32; i++){
-            if(chip8.display[i] == 1){
-                pixels[i] = 0xFFFFFFFF; // white
-            }else{
-                pixels[i] = 0xFF000000; // black
+        if(chip8.draw_flag){
+            // transform the chip-8 display into 32-bits colors
+            for(int i = 0; i < 64 * 32; i++){
+                if(chip8.display[i] == 1){
+                    pixels[i] = 0xFFFFFFFF; // white
+                }else{
+                    pixels[i] = 0xFF000000; // black
+                }
             }
-        }
 
-        // update the texture
-        SDL_UpdateTexture(texture, nullptr, pixels, 64 * sizeof(uint32_t));
-        // clear the renderer
-        SDL_RenderClear(renderer);
-        // copy the texture to the renderer
-        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-        // update the renderer
-        SDL_RenderPresent(renderer);
+            // update the texture
+            SDL_UpdateTexture(texture, nullptr, pixels, 64 * sizeof(uint32_t));
+            // clear the renderer
+            SDL_RenderClear(renderer);
+            // copy the texture to the renderer
+            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+            // update the renderer
+            SDL_RenderPresent(renderer);
+            // reset draw flag
+            chip8.draw_flag = false;
+        }
         // sleep for 16 milliseconds to maintain 60 frames per second
         SDL_Delay(16);
-
     }
 
     // close the application

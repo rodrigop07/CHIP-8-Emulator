@@ -5,11 +5,11 @@ TARGET = chip8
 INCLUDE_PATHS = -I"C:/msys64/ucrt64/include"
 LIBRARY_PATHS = -L"C:/msys64/ucrt64/lib"
 
-SRCS = main.cpp chip8.cpp
-OBJS = $(SRCS:.cpp=.o)
+SRCS = src/main.cpp src/chip8.cpp src/tinyfiledialogs.c
+OBJS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SRCS)))
 
 ifeq ($(OS), Windows_NT)
-    LIBS = -lmingw32 -lSDL2main -lSDL2
+    LIBS = -lmingw32 -lSDL2main -lSDL2 -lole32 -lcomdlg32
     RM = del /Q /F
     CLEAN_OBJS = $(subst /,\,$(OBJS))
     RUN_CMD = $(TARGET)
@@ -31,6 +31,9 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET)$(EXT) $(OBJS) $(LIBRARY_PATHS) $(LIBS)
 
 %.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) -c $< -o $@
+
+%.o: %.c
 	$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) -c $< -o $@
 
 clean:
