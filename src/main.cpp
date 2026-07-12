@@ -1,4 +1,5 @@
 #include "chip8.cpp"
+#include "tinyfiledialogs.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -6,7 +7,6 @@
 #include <filesystem>
 #include <atomic>
 #include <SDL2/SDL.h>
-#include "../headers/tinyfiledialogs.h"
 
 namespace fs = std::filesystem;
 
@@ -49,8 +49,8 @@ int chooseROM(Chip8& chip8){
     // open OS window to choose a rom
     char const *ROMPath = tinyfd_openFileDialog(
         "Select a ROM", // window title
-        "./roms", // directory to start
-        1, // number of filters
+        "./roms/", // directory to start
+        0, // number of filters
         filters, // array of filters
         "Chip-8 ROMs", // description
         0 // multiselect off
