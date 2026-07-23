@@ -1,5 +1,7 @@
 #include "chip8.cpp"
-#include "tinyfiledialogs.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl2.h"
+#include "imgui/imgui_impl_sdlrenderer2.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -42,57 +44,6 @@ void audioCallback(void* userdata, Uint8* stream, int len){
 
 }
 
-// menu to choose a rom
-int chooseROM(Chip8& chip8){
-    // type of files to show
-    char const *filters[1] = {"*.ch8"};
-    // open OS window to choose a rom
-    char const *ROMPath = tinyfd_openFileDialog(
-        "Select a ROM", // window title
-        "./roms/", // directory to start
-        0, // number of filters
-        filters, // array of filters
-        "Chip-8 ROMs", // description
-        0 // multiselect off
-    );
-
-    if(ROMPath == nullptr){
-        if(chip8.isInitialized){
-            return 1;
-        }else{
-            return 0;
-        }
-    } 
-
-    chip8.reset();
-    if(!chip8.loadROM(ROMPath)){
-        return 0;
-    }
-
-    return 1;
-
-    /*
-    std::vector<std::string> roms;
-    for(const auto &rom: fs::directory_iterator("./roms")){
-        if(fs::is_regular_file(rom.status())){
-            roms.push_back(rom.path().filename().string());
-        }
-    }
-    int opc = 0;
-    for(const auto &rom: roms){
-        std::cout << opc++ << " - " << rom << std::endl;
-    }
-    std::cout << "Select a ROM: ";
-    std::cin >> opc;
-    while(opc < 0 || opc >= (int)roms.size()){
-        std::cout << "Select a valid ROM: ";
-        std::cin >> opc;
-    }
-    
-    chip8.reset();
-    chip8.loadROM(std::string("roms/" + roms[opc]));
-    */
-}
 
 int main(int argc, char* args[]){
     
@@ -127,6 +78,18 @@ int main(int argc, char* args[]){
         SDL_Quit();
         return -1;
     }
+
+    // dear imgui init
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    
+    // dark mode
+    ImGui::StyleColorsDark();
+
+    // init sdl renderer for imgui
+    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer2_Init(renderer);
     
     // create sdl texture
     SDL_Texture* texture = SDL_CreateTexture(
@@ -169,16 +132,16 @@ int main(int argc, char* args[]){
     
     // present the renderer at the start
     SDL_RenderPresent(renderer);
-    
-    // initialize chip-8 emulator
+
     Chip8 chip8;
-    if(!chooseROM(chip8)){
-        std::cout << "No ROM selected!" << std::endl;
-        return -1;
-    }
+    bool rom_loaded = false;
+    bool show_rom_menu = false;
+    std::vector<std::string> roms_list;
     
     while(isRunning){
         while(SDL_PollEvent(&event) != 0){
+            // handle imgui events
+            ImGui_ImplSDL2_ProcessEvent(&event);
             // check if the event is a quit event (closing the window)
             if(event.type == SDL_QUIT){
                 isRunning = false;
@@ -201,7 +164,7 @@ int main(int argc, char* args[]){
                     case SDLK_r: chip8.keyboard[0xD] = 1; break;
                     case SDLK_f: chip8.keyboard[0xE] = 1; break;
                     case SDLK_v: chip8.keyboard[0xF] = 1; break;
-                    case SDLK_LCTRL: chooseROM(chip8); break;
+                    //case SDLK_LCTRL: chooseROM(chip8); break;
                 }
             }else if(event.type == SDL_KEYUP){
                 switch(event.key.keysym.sym){
@@ -225,22 +188,83 @@ int main(int argc, char* args[]){
             }
         }
 
-        // emulate the cpu clock at 60hz
-        for(int i = 0; i < 15; i++){
-            chip8.cycle();
-        }
+        // emmulate cpu only if a rom is loaded
+        if(rom_loaded){
+            // emulate the cpu clock at 60hz
+            for(int i = 0; i < 15; i++){
+                chip8.cycle();
+            }
 
-        // decrement timers at 60Hz
-        if(chip8.delay_timer > 0){
-            chip8.delay_timer--;
-            // send audio pulse
-            is_beeping = true;
+            // decrement timers at 60Hz
+            if(chip8.delay_timer > 0){
+                chip8.delay_timer--;
+                // send audio pulse
+                is_beeping = true;
+            }else{
+                // don't send audio pulse
+                is_beeping = false;
+            }
+
         }else{
-            // don't send audio pulse
             is_beeping = false;
         }
 
-        if(chip8.draw_flag){
+
+        ImGui_ImplSDLRenderer2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+        if(ImGui::BeginMainMenuBar()){
+            if(ImGui::BeginMenu("Archive")){
+                if(ImGui::MenuItem("Load ROM")){
+                    roms_list.clear();
+                    std::string dir_path = "./roms";
+
+                    if(std::filesystem::exists(dir_path)){
+                        for(const auto& arc: std::filesystem::directory_iterator(dir_path)){
+                            roms_list.push_back(arc.path().string());
+                        }
+                    }
+                    show_rom_menu = true;
+                }
+                ImGui::Separator();
+                if(ImGui::MenuItem("Exit")) isRunning = false;
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if(show_rom_menu){
+            ImGui::Begin("Select game", &show_rom_menu);
+
+            if(roms_list.empty()){
+                ImGui::Text("No ROMs found in ./roms");
+            }else{
+                ImGui::BeginChild("ROMsList", ImVec2(0, 150), true);
+                for(const std::string& rom_path: roms_list){
+                    // extract only the final name of the file
+                    std::string file_name = std::filesystem::path(rom_path).filename().string();
+
+                    // if user click on a ROM
+                    if(ImGui::Selectable(file_name.c_str())){
+                        // reset chip8
+                        chip8.reset();
+
+                        if(chip8.loadROM(rom_path)){
+                            // unclock cpu
+                            rom_loaded = true;
+                            // close rom selection menu
+                            show_rom_menu = false;
+                        }
+                    }
+                }
+                ImGui::EndChild();
+            }
+            ImGui::End();
+        }
+
+
+        if(chip8.draw_flag || !rom_loaded){
             // transform the chip-8 display into 32-bits colors
             for(int i = 0; i < 64 * 32; i++){
                 if(chip8.display[i] == 1){
@@ -249,18 +273,20 @@ int main(int argc, char* args[]){
                     pixels[i] = 0xFF000000; // black
                 }
             }
-
-            // update the texture
             SDL_UpdateTexture(texture, nullptr, pixels, 64 * sizeof(uint32_t));
-            // clear the renderer
-            SDL_RenderClear(renderer);
-            // copy the texture to the renderer
-            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-            // update the renderer
-            SDL_RenderPresent(renderer);
             // reset draw flag
             chip8.draw_flag = false;
         }
+
+        ImGui::Render();
+        // clear the renderer
+        SDL_RenderClear(renderer);
+        // copy the texture to the renderer
+        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        // draw imgui frame
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+        // update the renderer
+        SDL_RenderPresent(renderer);
         // sleep for 16 milliseconds to maintain 60 frames per second
         SDL_Delay(16);
     }
