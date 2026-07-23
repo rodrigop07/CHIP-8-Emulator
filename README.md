@@ -17,10 +17,9 @@ Um interpretador/emulador CHIP-8 escrito em C++ utilizando SDL2 para gráficos, 
 ```
 CHIP-8-Emulator/
 ├── src/
+│   ├── imgui/              # Biblioteca de interface gráfica
 │   ├── chip8.cpp           # Núcleo do CHIP-8: CPU, memória, display, temporizadores
-│   ├── main.cpp            # Janela SDL2, renderizador, áudio, loop de entrada
-│   ├── tinyfiledialogs.c   # Biblioteca de diálogo de arquivo nativo do SO
-│   └── tinyfiledialogs.h
+│   └── main.cpp            # Janela SDL2, renderizador, áudio, loop de entrada
 ├── roms/                   # Coleção com 24 ROMs clássicos do CHIP-8
 ├── Makefile
 └── README.md
