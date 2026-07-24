@@ -12,6 +12,10 @@
 
 namespace fs = std::filesystem;
 
+// window resolutions
+const int WIDTH = 960;
+const int HEIGHT = 480;
+
 // audio variables
 const int SAMPLE_RATE = 44100;
 const int AMPLITUDE = 3000;
@@ -58,8 +62,8 @@ int main(int argc, char* args[]){
         "Chip-8 Emulator", // title
         SDL_WINDOWPOS_CENTERED, // x position
         SDL_WINDOWPOS_CENTERED, // y position
-        960, // width
-        480, // height
+        WIDTH, // width
+        HEIGHT, // height
         SDL_WINDOW_SHOWN
     );
     
@@ -135,7 +139,9 @@ int main(int argc, char* args[]){
 
     Chip8 chip8;
     bool rom_loaded = false;
+    bool show_main_menu = false;
     bool show_rom_menu = false;
+    bool show_debug = false;
     std::vector<std::string> roms_list;
     
     while(isRunning){
@@ -164,7 +170,13 @@ int main(int argc, char* args[]){
                     case SDLK_r: chip8.keyboard[0xD] = 1; break;
                     case SDLK_f: chip8.keyboard[0xE] = 1; break;
                     case SDLK_v: chip8.keyboard[0xF] = 1; break;
-                    //case SDLK_LCTRL: chooseROM(chip8); break;
+                    case SDLK_ESCAPE:
+                        show_main_menu = !show_main_menu;
+                        if(!show_main_menu) show_rom_menu = false;
+                        break;
+                    case SDLK_TAB:
+                        show_debug = !show_debug;
+                        break;
                 }
             }else if(event.type == SDL_KEYUP){
                 switch(event.key.keysym.sym){
@@ -189,7 +201,7 @@ int main(int argc, char* args[]){
         }
 
         // emmulate cpu only if a rom is loaded
-        if(rom_loaded){
+        if(rom_loaded && !show_main_menu){
             // emulate the cpu clock at 60hz
             for(int i = 0; i < 15; i++){
                 chip8.cycle();
@@ -213,25 +225,36 @@ int main(int argc, char* args[]){
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+        
+        if(show_main_menu || !rom_loaded){
+            // define the window position
+            ImGui::SetNextWindowPos(ImVec2(WIDTH / 2 - 50, HEIGHT / 2 - 20), ImGuiCond_Always);
+            // window configurations
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
+                                     ImGuiWindowFlags_AlwaysAutoResize |
+                                     ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoFocusOnAppearing |
+                                     ImGuiWindowFlags_NoNav |
+                                     ImGuiWindowFlags_NoMove;
 
-        if(ImGui::BeginMainMenuBar()){
-            if(ImGui::BeginMenu("Archive")){
-                if(ImGui::MenuItem("Load ROM")){
+            ImGui::SetNextWindowBgAlpha(0.7f);
+            if(ImGui::Begin("Menu", nullptr, flags)){
+                if(ImGui::Button("Load ROM")){
                     roms_list.clear();
                     std::string dir_path = "./roms";
 
-                    if(std::filesystem::exists(dir_path)){
-                        for(const auto& arc: std::filesystem::directory_iterator(dir_path)){
+                    if(fs::exists(dir_path)){
+                        for(const auto& arc: fs::directory_iterator(dir_path)){
                             roms_list.push_back(arc.path().string());
                         }
                     }
                     show_rom_menu = true;
                 }
-                ImGui::Separator();
-                if(ImGui::MenuItem("Exit")) isRunning = false;
-                ImGui::EndMenu();
+                if(ImGui::Button("Exit")){
+                    isRunning = false;
+                }
             }
-            ImGui::EndMainMenuBar();
+            ImGui::End();
         }
 
         if(show_rom_menu){
@@ -243,7 +266,7 @@ int main(int argc, char* args[]){
                 ImGui::BeginChild("ROMsList", ImVec2(0, 150), true);
                 for(const std::string& rom_path: roms_list){
                     // extract only the final name of the file
-                    std::string file_name = std::filesystem::path(rom_path).filename().string();
+                    std::string file_name = fs::path(rom_path).filename().string();
 
                     // if user click on a ROM
                     if(ImGui::Selectable(file_name.c_str())){
@@ -253,8 +276,9 @@ int main(int argc, char* args[]){
                         if(chip8.loadROM(rom_path)){
                             // unclock cpu
                             rom_loaded = true;
-                            // close rom selection menu
+                            // reset menu state
                             show_rom_menu = false;
+                            show_main_menu = false;
                         }
                     }
                 }
@@ -263,8 +287,41 @@ int main(int argc, char* args[]){
             ImGui::End();
         }
 
+        // debug panel
+        if(show_debug){
+            // setup new window for debug
+            ImGui::Begin("Hardware state", &show_debug);
 
-        if(chip8.draw_flag || !rom_loaded){
+            // special registers
+            ImGui::Text("Special registers");
+            ImGui::Text("PC: 0x%04X", chip8.pc);
+            ImGui::Text("Index Register: 0x%04X", chip8.I);
+            ImGui::Separator();
+            
+            // time registers
+            ImGui::Text("Timers");
+            ImGui::Text("Delay Timer: 0x%02X", chip8.delay_timer);
+            ImGui::Text("Sound Timer: 0x%02X", chip8.sound_timer);
+            ImGui::Separator();
+            
+            // general purpose registers
+            ImGui::Text("V Registers");
+            for(int i = 0; i < 16; i++){
+                ImGui::Text("V%X - 0x%02X", i, chip8.V[i]);
+
+                if((i + 1) % 4 != 0){
+                    ImGui::SameLine();
+                }
+            }
+            // close the debug window
+            ImGui::End();
+
+
+        }
+
+
+        
+        if(chip8.draw_flag){
             // transform the chip-8 display into 32-bits colors
             for(int i = 0; i < 64 * 32; i++){
                 if(chip8.display[i] == 1){
