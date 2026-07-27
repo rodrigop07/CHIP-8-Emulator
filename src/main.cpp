@@ -13,8 +13,8 @@
 namespace fs = std::filesystem;
 
 // window resolutions
-const int WIDTH = 960;
-const int HEIGHT = 480;
+const int WIDTH = 1280;
+const int HEIGHT = 640;
 
 // audio variables
 const int SAMPLE_RATE = 44100;
@@ -289,8 +289,35 @@ int main(int argc, char* args[]){
 
         // debug panel
         if(show_debug){
-            // setup new window for debug
-            ImGui::Begin("Hardware state", &show_debug);
+            // get window width and height
+            int win_width, win_height;
+            SDL_GetWindowSize(window, &win_width, &win_height);
+
+            // set the ImGui window to full screen
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(ImVec2(win_width, win_height));
+            ImGui::SetNextWindowBgAlpha(1.0f);
+
+            ImGuiWindowFlags panel_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus;
+            ImGui::Begin("Debug Panel", nullptr, panel_flags);
+
+            // define the area for the game
+            float game_area_width = win_width - 350.0f;
+            float game_are_height = win_height;
+            ImGui::BeginChild("GameScreen", ImVec2(game_area_width, win_height), true);
+            //ImGui::Text("Emulator Display");
+
+            // calculate display size using available area to the game
+            float ch8_width = game_area_width - 20;
+            float ch8_height = ch8_width / 2.0f;
+        
+            // send the SDL texture to ImGui as a image
+            ImGui::Image((ImTextureID)(intptr_t)texture, ImVec2(ch8_width, ch8_height));
+            ImGui::EndChild();
+            ImGui::SameLine();
+
+            // hardware state area
+            ImGui::BeginChild("HardwareScreen", ImVec2(0, 0), true);
 
             // special registers
             ImGui::Text("Special registers");
@@ -303,6 +330,19 @@ int main(int argc, char* args[]){
             ImGui::Text("Delay Timer: 0x%02X", chip8.delay_timer);
             ImGui::Text("Sound Timer: 0x%02X", chip8.sound_timer);
             ImGui::Separator();
+
+            // stack and sp
+            ImGui::Text("Stack Pointer: 0x%04X", chip8.sp);
+            ImGui::Text("Stack:");
+            for(int i = 0; i < 16; i++){
+                ImGui::Text("0x%04X", chip8.stack[i]);
+
+                if((i + 1) % 4 != 0){
+                    ImGui::SameLine();
+                }
+            }
+            ImGui::Separator();
+            
             
             // general purpose registers
             ImGui::Text("V Registers");
@@ -313,10 +353,46 @@ int main(int argc, char* args[]){
                     ImGui::SameLine();
                 }
             }
+
+            ImGui::Separator();
+
+            // create collapsing header for memory
+            if(ImGui::CollapsingHeader("Memory")){
+                ImGui::BeginChild("MemoryView", ImVec2(0, 200), true);
+                // create list clipper to display memory
+                ImGuiListClipper clipper;
+                // 16 bytes per line, 256 lines in total
+                clipper.Begin(256);
+
+                // the clipper will step for each line that is visible in the window
+                while(clipper.Step()){
+                    for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++){
+                        // get the base address for the current line
+                        int baseAddr = row * 16;
+                        // display address
+                        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "0x%04X: ", baseAddr);
+
+                        // draw the 16 bytes of the current line
+                        for(int col = 0; col < 16; col++){
+                            ImGui::SameLine();
+                            
+                            if(baseAddr + col == chip8.pc || baseAddr + col == chip8.pc + 1){
+                                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%02X", chip8.memory[baseAddr + col]);
+
+                            }else{
+                                ImGui::Text("%02X", chip8.memory[baseAddr + col]);
+                            }
+                        }
+                        
+                    }
+                    
+                }
+                ImGui::EndChild();
+            }
+
+            ImGui::EndChild();
             // close the debug window
             ImGui::End();
-
-
         }
 
 
@@ -338,8 +414,10 @@ int main(int argc, char* args[]){
         ImGui::Render();
         // clear the renderer
         SDL_RenderClear(renderer);
-        // copy the texture to the renderer
-        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        if(!show_debug){
+            // copy the texture to the renderer
+            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        }
         // draw imgui frame
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
         // update the renderer
