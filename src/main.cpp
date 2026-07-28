@@ -301,66 +301,59 @@ int main(int argc, char* args[]){
             ImGuiWindowFlags panel_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus;
             ImGui::Begin("Debug Panel", nullptr, panel_flags);
 
-            // define the area for the game
-            float game_area_width = win_width - 350.0f;
-            float game_are_height = win_height;
-            ImGui::BeginChild("GameScreen", ImVec2(game_area_width, win_height), true);
-            //ImGui::Text("Emulator Display");
+            ImGui::BeginChild("Instructions", ImVec2(350, 0), true);
+            ImGui::BeginChild("InstructionsList", ImVec2(0,0), false);
 
-            // calculate display size using available area to the game
-            float ch8_width = game_area_width - 20;
-            float ch8_height = ch8_width / 2.0f;
-        
-            // send the SDL texture to ImGui as a image
-            ImGui::Image((ImTextureID)(intptr_t)texture, ImVec2(ch8_width, ch8_height));
+            ImGuiListClipper clipper;
+            clipper.Begin(2048);
+
+            while(clipper.Step()){
+                for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++){
+                    // each instruction is 2 bytes long
+                    int addr = row * 2;
+
+                    //get opcode
+                    uint16_t opcode = (chip8.memory[addr] << 8) | chip8.memory[addr + 1];
+
+                    // check if the current address is where the program counter is pointing to
+                    bool is_current_pc = (addr == chip8.pc);
+
+                    if(is_current_pc){
+                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> 0x%04X: %04X", addr, opcode);
+                    }else{
+                        ImGui::Text("0x%04X: %04X", addr, opcode);
+                    }
+                }
+            }
+
+            ImGui::EndChild();
             ImGui::EndChild();
             ImGui::SameLine();
 
-            // hardware state area
-            ImGui::BeginChild("HardwareScreen", ImVec2(0, 0), true);
+            ImGui::BeginChild("MidColumn", ImVec2(540, 0), false);
 
-            // special registers
-            ImGui::Text("Special registers");
-            ImGui::Text("PC: 0x%04X", chip8.pc);
-            ImGui::Text("Index Register: 0x%04X", chip8.I);
-            ImGui::Separator();
             
-            // time registers
-            ImGui::Text("Timers");
-            ImGui::Text("Delay Timer: 0x%02X", chip8.delay_timer);
-            ImGui::Text("Sound Timer: 0x%02X", chip8.sound_timer);
-            ImGui::Separator();
-
-            // stack and sp
-            ImGui::Text("Stack Pointer: 0x%04X", chip8.sp);
-            ImGui::Text("Stack:");
-            for(int i = 0; i < 16; i++){
-                ImGui::Text("0x%04X", chip8.stack[i]);
-
-                if((i + 1) % 4 != 0){
-                    ImGui::SameLine();
-                }
-            }
-            ImGui::Separator();
+            // define the area for the game
+            float game_area_width = 530.0f;
+            float game_are_height = 284.0f;
+            ImGui::BeginChild("GameScreen", ImVec2(0, game_are_height), true);
+            //ImGui::Text("Emulator Display");
             
+            // calculate display size using available area to the game
+            float ch8_width = game_area_width - 12.0f;
+            float ch8_height = ch8_width / 2.0f;
             
-            // general purpose registers
-            ImGui::Text("V Registers");
-            for(int i = 0; i < 16; i++){
-                ImGui::Text("V%X - 0x%02X", i, chip8.V[i]);
-
-                if((i + 1) % 4 != 0){
-                    ImGui::SameLine();
-                }
-            }
-
-            ImGui::Separator();
-
+            // send the SDL texture to ImGui as a image
+            ImGui::Image((ImTextureID)(intptr_t)texture, ImVec2(ch8_width, ch8_height));
+            ImGui::EndChild();
+            
+            //ImGui::BeginChild("Memory", ImVec2(256, 256), true);
             // create collapsing header for memory
-            if(ImGui::CollapsingHeader("Memory")){
+            //if(ImGui::CollapsingHeader("Memory")){
                 ImGui::BeginChild("MemoryView", ImVec2(0, 200), true);
+                ImGui::Text("Memory");
                 // create list clipper to display memory
-                ImGuiListClipper clipper;
+                //ImGuiListClipper clipper;
                 // 16 bytes per line, 256 lines in total
                 clipper.Begin(256);
 
@@ -378,7 +371,7 @@ int main(int argc, char* args[]){
                             
                             if(baseAddr + col == chip8.pc || baseAddr + col == chip8.pc + 1){
                                 ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%02X", chip8.memory[baseAddr + col]);
-
+                                
                             }else{
                                 ImGui::Text("%02X", chip8.memory[baseAddr + col]);
                             }
@@ -388,7 +381,47 @@ int main(int argc, char* args[]){
                     
                 }
                 ImGui::EndChild();
+            //}
+            
+            //ImGui::EndChild();
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+
+            // hardware state area
+            ImGui::BeginChild("HardwareScreen", ImVec2(350, 0), true);
+
+            // special registers
+            ImGui::Text("Special registers");
+            ImGui::Text("PC: 0x%04X", chip8.pc);
+            ImGui::Text("Index Register: 0x%04X", chip8.I);
+            ImGui::Separator();
+            
+            // time registers
+            ImGui::Text("Timers");
+            ImGui::Text("Delay Timer: 0x%02X", chip8.delay_timer);
+            ImGui::Text("Sound Timer: 0x%02X", chip8.sound_timer);
+            ImGui::Separator();
+
+            // general purpose registers
+            ImGui::Text("V Registers");
+            for(int i = 0; i < 16; i++){
+                ImGui::Text("V%X - 0x%02X", i, chip8.V[i]);
+
+                if((i + 1) % 4 != 0){
+                    ImGui::SameLine();
+                }
             }
+            ImGui::Separator();
+
+            // stack and sp
+            ImGui::Text("Stack Pointer: 0x%04X", chip8.sp);
+            ImGui::Text("Stack:");
+            for(int i = 0; i < 16; i++){
+                ImGui::Text("0x%04X     (%d)", chip8.stack[i], i);
+            }
+            ImGui::Separator();
+
 
             ImGui::EndChild();
             // close the debug window
