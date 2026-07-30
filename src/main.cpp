@@ -1,4 +1,5 @@
 #include "chip8.cpp"
+#include "disassembler.cpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 #include "imgui/imgui_impl_sdlrenderer2.h"
@@ -137,7 +138,12 @@ int main(int argc, char* args[]){
     // present the renderer at the start
     SDL_RenderPresent(renderer);
 
+    // cpu
     Chip8 chip8;
+    // disassembler
+    Disassembler disassembler;
+    //
+    std::vector<std::string> instructions_list;
     bool rom_loaded = false;
     bool show_main_menu = false;
     bool show_rom_menu = false;
@@ -228,7 +234,7 @@ int main(int argc, char* args[]){
         
         if(show_main_menu || !rom_loaded){
             // define the window position
-            ImGui::SetNextWindowPos(ImVec2(WIDTH / 2 - 50, HEIGHT / 2 - 20), ImGuiCond_Always);
+            ImGui::SetNextWindowPos(ImVec2(WIDTH / 2.0f - 50, HEIGHT / 2.0f - 20), ImGuiCond_Always);
             // window configurations
             ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
                                      ImGuiWindowFlags_AlwaysAutoResize |
@@ -279,6 +285,7 @@ int main(int argc, char* args[]){
                             // reset menu state
                             show_rom_menu = false;
                             show_main_menu = false;
+                            instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
                         }
                     }
                 }
@@ -304,24 +311,29 @@ int main(int argc, char* args[]){
             ImGui::BeginChild("Instructions", ImVec2(350, 0), true);
             ImGui::BeginChild("InstructionsList", ImVec2(0,0), false);
 
+            static uint16_t last_pc = 0;
+            if(!ImGui::IsMouseDown(ImGuiMouseButton_Left) && abs((int)chip8.pc - (int)last_pc) > 2){
+                float line_height = ImGui::GetTextLineHeightWithSpacing();
+                float target_row = (chip8.pc - 0x200) / 2.0f;
+                ImGui::SetScrollY(target_row * line_height - (ImGui::GetWindowHeight() / 2.0f));
+            }
+            last_pc = chip8.pc;
+
             ImGuiListClipper clipper;
-            clipper.Begin(2048);
+            clipper.Begin(instructions_list.size());
 
             while(clipper.Step()){
                 for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++){
-                    // each instruction is 2 bytes long
-                    int addr = row * 2;
-
-                    //get opcode
-                    uint16_t opcode = (chip8.memory[addr] << 8) | chip8.memory[addr + 1];
+                    //get instruction
+                    std::string instruction = instructions_list[row]; 
 
                     // check if the current address is where the program counter is pointing to
-                    bool is_current_pc = (addr == chip8.pc);
+                    bool is_current_pc = (0x200 + (row * 2) == chip8.pc);
 
                     if(is_current_pc){
-                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> 0x%04X: %04X", addr, opcode);
+                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> 0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
                     }else{
-                        ImGui::Text("0x%04X: %04X", addr, opcode);
+                        ImGui::Text("0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
                     }
                 }
             }
@@ -418,7 +430,11 @@ int main(int argc, char* args[]){
             ImGui::Text("Stack Pointer: 0x%04X", chip8.sp);
             ImGui::Text("Stack:");
             for(int i = 0; i < 16; i++){
-                ImGui::Text("0x%04X     (%d)", chip8.stack[i], i);
+                if(i == chip8.sp){
+                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "0x%04X     (%d) <-", chip8.stack[i], i);
+                }else{
+                    ImGui::Text("0x%04X     (%d)", chip8.stack[i], i);
+                }
             }
             ImGui::Separator();
 

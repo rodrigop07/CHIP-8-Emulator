@@ -23,6 +23,7 @@ class Chip8{
         uint8_t display[64 * 32]; // 64*32px monocromatic display
         uint8_t keyboard[16]; // 16 keys keyboard
         //
+        int rom_size;
         bool draw_flag;
         bool isInitialized;
 
@@ -33,6 +34,7 @@ class Chip8{
             sp = 0;
             delay_timer = 0;
             sound_timer = 0;
+            rom_size = 0;
             draw_flag = true;
             isInitialized = false;
 
@@ -418,7 +420,7 @@ class Chip8{
                             break;
                         }
 
-                        case 0xA1:{
+                        case 0xA1:{ // 0xExA1: SKNP Vx - skip next instruction if key with value of Vx is not pressed
                             uint8_t x = (opcode >> 8) & 0x0F;
                             if(keyboard[V[x]] == 0){
                                 pc += 4;
@@ -555,6 +557,7 @@ class Chip8{
                     }
                 }
                 file.close();
+                rom_size = size;
                 isInitialized = true;
                 return true;
             }
