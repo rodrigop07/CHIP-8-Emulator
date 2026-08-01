@@ -2,9 +2,9 @@
 #include <vector>
 #include <cstdio>
 
-class Disassembler {
-    public:
-        std::vector<std::string> disassemble(const uint8_t *memory, int rom_size){
+#include "disassembler.h"
+
+std::vector<std::string> Disassembler::disassemble(const uint8_t *memory, int rom_size){
             std::vector<std::string> instructions_list;
             uint16_t instruction;
             char buf[64];
@@ -220,4 +220,3 @@ class Disassembler {
 
             return instructions_list;
         }
-};

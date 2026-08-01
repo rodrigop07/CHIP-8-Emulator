@@ -6,29 +6,9 @@
 #include <vector>
 
 
-class Chip8{
-    public:
-        // chip-8 components
-        uint8_t memory[4096]; // 4kb ram
-        uint8_t V[16]; // 16 8-bit registers
-        uint16_t I; // index register
-        uint16_t pc; // program counter
-        //
-        uint16_t stack[16]; // stack to call subroutines
-        uint16_t sp; // points to the top of the stack
-        //
-        uint8_t delay_timer; // delay timer
-        uint8_t sound_timer; // sound timer
-        // 
-        uint8_t display[64 * 32]; // 64*32px monocromatic display
-        uint8_t keyboard[16]; // 16 keys keyboard
-        //
-        int rom_size;
-        bool draw_flag;
-        bool isInitialized;
-
+#include "chip8.h"
         // constructor
-        Chip8(){
+        Chip8::Chip8() {
             pc = 0x200; // pc always starts at 0x200 address
             I = 0;
             sp = 0;
@@ -71,7 +51,7 @@ class Chip8{
             }
         }
 
-        void reset(){
+        void Chip8::reset(){
             pc = 0x200;
             I = 0;
             sp = 0;
@@ -86,7 +66,7 @@ class Chip8{
         }
 
         // emulates the cpu cycle
-        void cycle(){
+        void Chip8::cycle() {
             // fetch
             // chip8 memory store bytes, so the first byte goes to the 8 most significant bits, and the next byte on memory goes to the 8 least significant bits
             uint16_t opcode = (memory[pc] << 8 ) | memory[pc + 1];
@@ -541,7 +521,7 @@ class Chip8{
         }
 
         // loads ROM to memory
-        bool loadROM(const std::string& fileName){
+        bool Chip8::loadROM(const std::string& fileName) {
             // opens file in binary mode and place a pointer at the end
             std::ifstream file(fileName, std::ios::binary | std::ios::ate);
             if(file.is_open()){
@@ -563,4 +543,3 @@ class Chip8{
             }
             return false;
         }
-};

@@ -1,5 +1,5 @@
-#include "chip8.cpp"
-#include "disassembler.cpp"
+#include "chip8.h"
+#include "disassembler.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl2.h"
 #include "imgui/imgui_impl_sdlrenderer2.h"
@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <atomic>
 #include <SDL2/SDL.h>
@@ -144,11 +145,28 @@ int main(int argc, char* args[]){
     Disassembler disassembler;
     //
     std::vector<std::string> instructions_list;
+    std::string current_rom_path;
     bool rom_loaded = false;
     bool show_main_menu = false;
     bool show_rom_menu = false;
     bool show_debug = false;
+    bool is_paused = false;
+    int inst_per_frame = 15;
     std::vector<std::string> roms_list;
+
+    const int keypad_layout[16] = {
+        0x1, 0x2, 0x3, 0xC,
+        0x4, 0x5, 0x6, 0xD,
+        0x7, 0x8, 0x9, 0xE,
+        0xA, 0x0, 0xB, 0xF
+    };
+
+    const char* key_map[16] = {
+        "1", "2", "3", "C",
+        "4", "5", "6", "D",
+        "7", "8", "9", "E",
+        "A", "0", "B", "F"
+    };
     
     while(isRunning){
         while(SDL_PollEvent(&event) != 0){
@@ -207,15 +225,19 @@ int main(int argc, char* args[]){
         }
 
         // emmulate cpu only if a rom is loaded
-        if(rom_loaded && !show_main_menu){
+        if(rom_loaded && !show_main_menu && !is_paused){
             // emulate the cpu clock at 60hz
-            for(int i = 0; i < 15; i++){
+            for(int i = 0; i < inst_per_frame; i++){
                 chip8.cycle();
             }
 
             // decrement timers at 60Hz
             if(chip8.delay_timer > 0){
                 chip8.delay_timer--;
+            }
+
+            if(chip8.sound_timer > 0){
+                chip8.sound_timer--;
                 // send audio pulse
                 is_beeping = true;
             }else{
@@ -285,6 +307,7 @@ int main(int argc, char* args[]){
                             // reset menu state
                             show_rom_menu = false;
                             show_main_menu = false;
+                            current_rom_path = rom_path;
                             instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
                         }
                     }
@@ -309,16 +332,21 @@ int main(int argc, char* args[]){
             ImGui::Begin("Debug Panel", nullptr, panel_flags);
 
             ImGui::BeginChild("Instructions", ImVec2(350, 0), true);
-            ImGui::BeginChild("InstructionsList", ImVec2(0,0), false);
+            ImGui::Text("Disassembler");
 
+            ImGui::BeginChild("InstructionsList", ImVec2(0, 350), false);
+
+
+            // logic to keep pc always visible in instructions list
             static uint16_t last_pc = 0;
             if(!ImGui::IsMouseDown(ImGuiMouseButton_Left) && abs((int)chip8.pc - (int)last_pc) > 2){
                 float line_height = ImGui::GetTextLineHeightWithSpacing();
                 float target_row = (chip8.pc - 0x200) / 2.0f;
-                ImGui::SetScrollY(target_row * line_height - (ImGui::GetWindowHeight() / 2.0f));
+                ImGui::SetScrollY(target_row * line_height - (350 / 2.0f));
             }
             last_pc = chip8.pc;
 
+            // create a clipper with the size of instructions_list
             ImGuiListClipper clipper;
             clipper.Begin(instructions_list.size());
 
@@ -330,6 +358,7 @@ int main(int argc, char* args[]){
                     // check if the current address is where the program counter is pointing to
                     bool is_current_pc = (0x200 + (row * 2) == chip8.pc);
 
+                    // print instruction with pc highlighted
                     if(is_current_pc){
                         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> 0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
                     }else{
@@ -337,8 +366,51 @@ int main(int argc, char* args[]){
                     }
                 }
             }
+            
+            ImGui::EndChild();
+            ImGui::Separator();
+
+            ImGui::BeginChild("HardwareControls", ImVec2(0, 0));
+            ImGui::Text("Hardware Controls");
+            ImGui::Separator();
+            ImGui::Checkbox("Pause", &is_paused);
+            ImGui::BeginDisabled(!is_paused);
+            if(ImGui::Button("Step One")){
+                chip8.cycle();
+            }
+            ImGui::EndDisabled();
+
+            ImGui::SetNextItemWidth(120);
+            if(ImGui::InputInt("Cycles/Frame", &inst_per_frame)){
+                if(inst_per_frame < 1) inst_per_frame = 1;
+                if(inst_per_frame > 1000) inst_per_frame = 1000;
+            }
+
+            if(ImGui::Button("Reset ROM")){
+                chip8.reset();
+                chip8.loadROM(current_rom_path);
+                instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
+            }
+
+            for(int i = 0; i < 16; i++){
+                if(i % 4 != 0) ImGui::SameLine();
+
+                int index = keypad_layout[i];
+                
+                if(chip8.keyboard[index]){
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+                }
+                
+                ImGui::Button(key_map[i], ImVec2(25, 25));
+                
+                if(chip8.keyboard[index]){
+                    ImGui::PopStyleColor();
+                }
+            }
+
 
             ImGui::EndChild();
+
             ImGui::EndChild();
             ImGui::SameLine();
 

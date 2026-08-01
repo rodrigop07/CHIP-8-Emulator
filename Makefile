@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -O3 -Wall -std=c++17
 TARGET = chip8
 
-SRCS = src/main.cpp src/chip8.cpp $(wildcard src/imgui/*.cpp)
+SRCS = src/main.cpp src/chip8.cpp src/disassembler.cpp $(wildcard src/imgui/*.cpp)
 OBJS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SRCS)))
 
 ifeq ($(OS), Windows_NT)
