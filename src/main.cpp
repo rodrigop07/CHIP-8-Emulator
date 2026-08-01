@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <atomic>
@@ -89,9 +90,45 @@ int main(int argc, char* args[]){
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    
-    // dark mode
+
+    // custom dark style
     ImGui::StyleColorsDark();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding    = 3.0f;
+    style.FrameRounding     = 2.0f;
+    style.PopupRounding     = 2.0f;
+    style.ScrollbarRounding = 2.0f;
+    style.GrabRounding      = 2.0f;
+    style.WindowPadding     = ImVec2(16.0f, 14.0f);
+    style.FramePadding      = ImVec2(10.0f, 6.0f);
+    style.ItemSpacing       = ImVec2(10.0f, 8.0f);
+    style.ScrollbarSize     = 12.0f;
+
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ImGuiCol_WindowBg]         = ImVec4(0.06f, 0.08f, 0.13f, 0.95f);
+    colors[ImGuiCol_ChildBg]          = ImVec4(0.04f, 0.06f, 0.10f, 1.00f);
+    colors[ImGuiCol_Border]           = ImVec4(0.18f, 0.28f, 0.45f, 0.70f);
+    colors[ImGuiCol_FrameBg]          = ImVec4(0.08f, 0.12f, 0.22f, 1.00f);
+    colors[ImGuiCol_FrameBgHovered]   = ImVec4(0.12f, 0.18f, 0.32f, 1.00f);
+    colors[ImGuiCol_FrameBgActive]    = ImVec4(0.15f, 0.22f, 0.40f, 1.00f);
+    colors[ImGuiCol_TitleBg]          = ImVec4(0.05f, 0.08f, 0.15f, 1.00f);
+    colors[ImGuiCol_TitleBgActive]    = ImVec4(0.08f, 0.14f, 0.28f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg]      = ImVec4(0.04f, 0.06f, 0.10f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrab]    = ImVec4(0.18f, 0.35f, 0.60f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.25f, 0.48f, 0.80f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.30f, 0.58f, 1.00f, 1.00f);
+    colors[ImGuiCol_Button]           = ImVec4(0.12f, 0.22f, 0.45f, 1.00f);
+    colors[ImGuiCol_ButtonHovered]    = ImVec4(0.18f, 0.35f, 0.68f, 1.00f);
+    colors[ImGuiCol_ButtonActive]     = ImVec4(0.22f, 0.45f, 0.85f, 1.00f);
+    colors[ImGuiCol_Header]           = ImVec4(0.14f, 0.25f, 0.50f, 0.80f);
+    colors[ImGuiCol_HeaderHovered]    = ImVec4(0.20f, 0.36f, 0.65f, 0.90f);
+    colors[ImGuiCol_HeaderActive]     = ImVec4(0.25f, 0.45f, 0.80f, 1.00f);
+    colors[ImGuiCol_Separator]        = ImVec4(0.15f, 0.25f, 0.45f, 0.80f);
+    colors[ImGuiCol_CheckMark]        = ImVec4(0.35f, 0.65f, 1.00f, 1.00f);
+    colors[ImGuiCol_SliderGrab]       = ImVec4(0.25f, 0.48f, 0.85f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.35f, 0.60f, 1.00f, 1.00f);
+    colors[ImGuiCol_Text]             = ImVec4(0.85f, 0.90f, 1.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled]     = ImVec4(0.35f, 0.42f, 0.55f, 1.00f);
 
     // init sdl renderer for imgui
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -153,6 +190,8 @@ int main(int argc, char* args[]){
     bool is_paused = false;
     int inst_per_frame = 15;
     std::vector<std::string> roms_list;
+    char rom_search_buf[128] = {};
+    int selected_rom_index = -1;
 
     const int keypad_layout[16] = {
         0x1, 0x2, 0x3, 0xC,
@@ -255,64 +294,209 @@ int main(int argc, char* args[]){
         ImGui::NewFrame();
         
         if(show_main_menu || !rom_loaded){
-            // define the window position
-            ImGui::SetNextWindowPos(ImVec2(WIDTH / 2.0f - 50, HEIGHT / 2.0f - 20), ImGuiCond_Always);
-            // window configurations
+            // center the menu window
+            ImGui::SetNextWindowPos(ImVec2(WIDTH / 2.0f, HEIGHT / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(260, 0), ImGuiCond_Always);
+            ImGui::SetNextWindowBgAlpha(0.96f);
+
             ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
-                                     ImGuiWindowFlags_AlwaysAutoResize |
                                      ImGuiWindowFlags_NoSavedSettings |
                                      ImGuiWindowFlags_NoFocusOnAppearing |
                                      ImGuiWindowFlags_NoNav |
-                                     ImGuiWindowFlags_NoMove;
+                                     ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_AlwaysAutoResize;
 
-            ImGui::SetNextWindowBgAlpha(0.7f);
-            if(ImGui::Begin("Menu", nullptr, flags)){
-                if(ImGui::Button("Load ROM")){
+            if(ImGui::Begin("##MainMenu", nullptr, flags)){
+                // title
+                float title_w = ImGui::CalcTextSize("CHIP-8 EMULATOR").x;
+                ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - title_w) * 0.5f + ImGui::GetStyle().WindowPadding.x);
+                ImGui::TextColored(ImVec4(0.40f, 0.70f, 1.00f, 1.0f), "CHIP-8 EMULATOR");
+
+                float sub_w = ImGui::CalcTextSize("v1.0").x;
+                ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - sub_w) * 0.5f + ImGui::GetStyle().WindowPadding.x);
+                ImGui::TextColored(ImVec4(0.35f, 0.52f, 0.75f, 1.0f), "v1.0");
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // show current rom name if loaded
+                if(rom_loaded && !current_rom_path.empty()){
+                    std::string loaded_name = fs::path(current_rom_path).filename().string();
+                    ImGui::TextColored(ImVec4(0.50f, 0.85f, 0.60f, 1.0f), "  Loaded: %s", loaded_name.c_str());
+                    ImGui::Spacing();
+                }
+
+                float btn_w = ImGui::GetContentRegionAvail().x;
+
+                // Load ROM button (blue accent)
+                ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.22f, 0.48f, 1.00f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.34f, 0.70f, 1.00f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f, 0.44f, 0.90f, 1.00f));
+                if(ImGui::Button("  Load ROM", ImVec2(btn_w, 36))){
                     roms_list.clear();
+                    selected_rom_index = -1;
+                    std::memset(rom_search_buf, 0, sizeof(rom_search_buf));
                     std::string dir_path = "./roms";
-
                     if(fs::exists(dir_path)){
                         for(const auto& arc: fs::directory_iterator(dir_path)){
                             roms_list.push_back(arc.path().string());
                         }
+                        std::sort(roms_list.begin(), roms_list.end());
                     }
                     show_rom_menu = true;
                 }
-                if(ImGui::Button("Exit")){
+                ImGui::PopStyleColor(3);
+
+                ImGui::Spacing();
+
+                // Resume button (only when a rom is loaded)
+                if(rom_loaded){
+                    ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.35f, 0.18f, 1.00f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.52f, 0.26f, 1.00f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.22f, 0.65f, 0.32f, 1.00f));
+                    if(ImGui::Button("  Resume", ImVec2(btn_w, 36))){
+                        show_main_menu = false;
+                        show_rom_menu  = false;
+                    }
+                    ImGui::PopStyleColor(3);
+                    ImGui::Spacing();
+                }
+
+                // Exit button (danger color)
+                ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.45f, 0.10f, 0.10f, 1.00f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.15f, 0.15f, 1.00f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.80f, 0.20f, 0.20f, 1.00f));
+                if(ImGui::Button("  Exit", ImVec2(btn_w, 36))){
                     isRunning = false;
                 }
+                ImGui::PopStyleColor(3);
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.28f, 0.38f, 0.55f, 1.0f), "  ESC: toggle menu   TAB: debug");
             }
             ImGui::End();
         }
 
         if(show_rom_menu){
-            ImGui::Begin("Select game", &show_rom_menu);
+            ImGui::SetNextWindowPos(ImVec2(WIDTH / 2.0f, HEIGHT / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(420, 340), ImGuiCond_Always);
+            ImGui::SetNextWindowBgAlpha(0.97f);
 
-            if(roms_list.empty()){
-                ImGui::Text("No ROMs found in ./roms");
-            }else{
-                ImGui::BeginChild("ROMsList", ImVec2(0, 150), true);
-                for(const std::string& rom_path: roms_list){
-                    // extract only the final name of the file
-                    std::string file_name = fs::path(rom_path).filename().string();
+            ImGuiWindowFlags rom_flags = ImGuiWindowFlags_NoResize |
+                                         ImGuiWindowFlags_NoMove |
+                                         ImGuiWindowFlags_NoSavedSettings;
 
-                    // if user click on a ROM
-                    if(ImGui::Selectable(file_name.c_str())){
-                        // reset chip8
+            if(ImGui::Begin("  Select ROM", &show_rom_menu, rom_flags)){
+                // search bar
+                ImGui::SetNextItemWidth(-1);
+                ImGui::InputTextWithHint("##search", "Search...", rom_search_buf, sizeof(rom_search_buf));
+                ImGui::Spacing();
+
+                if(roms_list.empty()){
+                    ImGui::Spacing();
+                    float msg_w = ImGui::CalcTextSize("No ROMs found in ./roms/").x;
+                    ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - msg_w) * 0.5f + ImGui::GetStyle().WindowPadding.x);
+                    ImGui::TextColored(ImVec4(0.70f, 0.40f, 0.40f, 1.0f), "No ROMs found in ./roms/");
+                }else{
+                    // build filtered list
+                    std::string filter(rom_search_buf);
+                    std::vector<int> filtered;
+                    for(int i = 0; i < (int)roms_list.size(); i++){
+                        std::string name = fs::path(roms_list[i]).filename().string();
+                        // case-insensitive check
+                        std::string name_lw = name, filter_lw = filter;
+                        for(auto& c : name_lw)   c = (char)std::tolower((unsigned char)c);
+                        for(auto& c : filter_lw) c = (char)std::tolower((unsigned char)c);
+                        if(filter.empty() || name_lw.find(filter_lw) != std::string::npos){
+                            filtered.push_back(i);
+                        }
+                    }
+
+                    // count label
+                    ImGui::TextColored(ImVec4(0.35f, 0.55f, 0.85f, 1.0f),
+                        "%d ROM(s)", (int)filtered.size());
+                    ImGui::Spacing();
+
+                    // rom list child window
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.04f, 0.06f, 0.12f, 1.0f));
+                    ImGui::BeginChild("ROMsList", ImVec2(-1, 200), true);
+
+                    for(int fi = 0; fi < (int)filtered.size(); fi++){
+                        int idx = filtered[fi];
+                        const std::string& rom_path = roms_list[idx];
+                        std::string file_name = fs::path(rom_path).filename().string();
+
+                        bool is_selected = (selected_rom_index == idx);
+
+                        // alternating row background
+                        if(fi % 2 == 0){
+                            ImVec2 row_min = ImGui::GetCursorScreenPos();
+                            ImVec2 row_max = ImVec2(row_min.x + ImGui::GetContentRegionAvail().x,
+                                                    row_min.y + ImGui::GetTextLineHeightWithSpacing());
+                            ImGui::GetWindowDrawList()->AddRectFilled(
+                                row_min, row_max, IM_COL32(20, 18, 35, 120));
+                        }
+
+                        if(is_selected){
+                            ImGui::PushStyleColor(ImGuiCol_Header,        ImVec4(0.35f, 0.28f, 0.70f, 1.0f));
+                            ImGui::PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.42f, 0.34f, 0.80f, 1.0f));
+                        }
+
+                        if(ImGui::Selectable(("  " + file_name).c_str(), is_selected,
+                                             ImGuiSelectableFlags_AllowDoubleClick)){
+                            selected_rom_index = idx;
+
+                            if(ImGui::IsMouseDoubleClicked(0)){
+                                chip8.reset();
+                                if(chip8.loadROM(rom_path)){
+                                    rom_loaded       = true;
+                                    show_rom_menu    = false;
+                                    show_main_menu   = false;
+                                    current_rom_path = rom_path;
+                                    instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
+                                }
+                            }
+                        }
+
+                        if(is_selected){
+                            ImGui::PopStyleColor(2);
+                        }
+                    }
+
+                    ImGui::EndChild();
+                    ImGui::PopStyleColor();
+
+                    ImGui::Spacing();
+                    ImGui::TextColored(ImVec4(0.28f, 0.42f, 0.62f, 1.0f), "Double-click to load");
+                    ImGui::SameLine();
+
+                    float load_btn_w = 100.0f;
+                    ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x - load_btn_w + ImGui::GetStyle().WindowPadding.x);
+
+                    bool can_load = (selected_rom_index >= 0 && selected_rom_index < (int)roms_list.size());
+                    if(!can_load) ImGui::BeginDisabled();
+
+                    ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.22f, 0.48f, 1.00f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.34f, 0.70f, 1.00f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f, 0.44f, 0.90f, 1.00f));
+                    if(ImGui::Button("Load", ImVec2(load_btn_w, 0))){
+                        const std::string& rom_path = roms_list[selected_rom_index];
                         chip8.reset();
-
                         if(chip8.loadROM(rom_path)){
-                            // unclock cpu
-                            rom_loaded = true;
-                            // reset menu state
-                            show_rom_menu = false;
-                            show_main_menu = false;
+                            rom_loaded       = true;
+                            show_rom_menu    = false;
+                            show_main_menu   = false;
                             current_rom_path = rom_path;
                             instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
                         }
                     }
+                    ImGui::PopStyleColor(3);
+
+                    if(!can_load) ImGui::EndDisabled();
                 }
-                ImGui::EndChild();
             }
             ImGui::End();
         }
@@ -392,6 +576,12 @@ int main(int argc, char* args[]){
                 instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
             }
 
+            ImGui::SameLine();
+
+            if(ImGui::Button("Load ROM")){
+                show_rom_menu = true;
+            }
+
             for(int i = 0; i < 16; i++){
                 if(i % 4 != 0) ImGui::SameLine();
 
@@ -416,7 +606,6 @@ int main(int argc, char* args[]){
 
             ImGui::BeginChild("MidColumn", ImVec2(540, 0), false);
 
-            
             // define the area for the game
             float game_area_width = 530.0f;
             float game_are_height = 284.0f;
