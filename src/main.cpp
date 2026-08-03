@@ -350,11 +350,11 @@ int main(int argc, char* args[]){
 
                 ImGui::Spacing();
 
-                // Resume button (only when a rom is loaded)
+                // resume button (only when a rom is loaded)
                 if(rom_loaded){
-                    ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.35f, 0.18f, 1.00f));
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.35f, 0.18f, 1.00f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.52f, 0.26f, 1.00f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.22f, 0.65f, 0.32f, 1.00f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.22f, 0.65f, 0.32f, 1.00f));
                     if(ImGui::Button("  Resume", ImVec2(btn_w, 36))){
                         show_main_menu = false;
                         show_rom_menu  = false;
@@ -363,7 +363,7 @@ int main(int argc, char* args[]){
                     ImGui::Spacing();
                 }
 
-                // Exit button (danger color)
+                // exit button (danger color)
                 ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.45f, 0.10f, 0.10f, 1.00f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.15f, 0.15f, 1.00f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.80f, 0.20f, 0.20f, 1.00f));
@@ -382,7 +382,7 @@ int main(int argc, char* args[]){
 
         if(show_rom_menu){
             ImGui::SetNextWindowPos(ImVec2(WIDTH / 2.0f, HEIGHT / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(420, 340), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(440, 360), ImGuiCond_Always);
             ImGui::SetNextWindowBgAlpha(0.97f);
 
             ImGuiWindowFlags rom_flags = ImGuiWindowFlags_NoResize |
@@ -434,10 +434,8 @@ int main(int argc, char* args[]){
                         // alternating row background
                         if(fi % 2 == 0){
                             ImVec2 row_min = ImGui::GetCursorScreenPos();
-                            ImVec2 row_max = ImVec2(row_min.x + ImGui::GetContentRegionAvail().x,
-                                                    row_min.y + ImGui::GetTextLineHeightWithSpacing());
-                            ImGui::GetWindowDrawList()->AddRectFilled(
-                                row_min, row_max, IM_COL32(20, 18, 35, 120));
+                            ImVec2 row_max = ImVec2(row_min.x + ImGui::GetContentRegionAvail().x, row_min.y + ImGui::GetTextLineHeightWithSpacing());
+                            ImGui::GetWindowDrawList()->AddRectFilled(row_min, row_max, IM_COL32(20, 18, 35, 120));
                         }
 
                         if(is_selected){
@@ -445,8 +443,7 @@ int main(int argc, char* args[]){
                             ImGui::PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.42f, 0.34f, 0.80f, 1.0f));
                         }
 
-                        if(ImGui::Selectable(("  " + file_name).c_str(), is_selected,
-                                             ImGuiSelectableFlags_AllowDoubleClick)){
+                        if(ImGui::Selectable(("  " + file_name).c_str(), is_selected, ImGuiSelectableFlags_AllowDoubleClick)){
                             selected_rom_index = idx;
 
                             if(ImGui::IsMouseDoubleClicked(0)){
@@ -515,58 +512,75 @@ int main(int argc, char* args[]){
             ImGuiWindowFlags panel_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus;
             ImGui::Begin("Debug Panel", nullptr, panel_flags);
 
-            ImGui::BeginChild("Instructions", ImVec2(350, 0), true);
+            // available area inside the debug window
+            float avail_w = ImGui::GetContentRegionAvail().x;
+            float avail_h = ImGui::GetContentRegionAvail().y;
+
+            // column widths: left=260, right=280, mid takes the rest
+            float col_left  = 260.0f;
+            float col_right = 280.0f;
+            float col_mid_w = avail_w - col_left - col_right - ImGui::GetStyle().ItemSpacing.x * 2.0f;
+
+            // left column: disassembler + instruction controls
+            ImGui::BeginChild("Instructions", ImVec2(col_left, 0), true);
             ImGui::Text("Disassembler");
+            ImGui::Separator();
 
-            ImGui::BeginChild("InstructionsList", ImVec2(0, 350), false);
+            // disassembler list uses most of the column; controls sit at the bottom
+            float ctrl_h   = ImGui::GetTextLineHeightWithSpacing() * 6.0f
+                           + ImGui::GetStyle().ItemSpacing.y * 5.0f
+                           + ImGui::GetStyle().WindowPadding.y * 2.0f
+                           + 10.0f; // small margin
+            float disasm_h = avail_h - ctrl_h
+                           - ImGui::GetStyle().ItemSpacing.y   // separator gap
+                           - ImGui::GetStyle().WindowPadding.y * 2.0f
+                           - ImGui::GetTextLineHeightWithSpacing(); // "Disassembler" label
 
+            ImGui::BeginChild("InstructionsList", ImVec2(0, disasm_h), false);
 
-            // logic to keep pc always visible in instructions list
+            // keep PC visible in the list
             static uint16_t last_pc = 0;
             if(!ImGui::IsMouseDown(ImGuiMouseButton_Left) && abs((int)chip8.pc - (int)last_pc) > 2){
                 float line_height = ImGui::GetTextLineHeightWithSpacing();
-                float target_row = (chip8.pc - 0x200) / 2.0f;
-                ImGui::SetScrollY(target_row * line_height - (350 / 2.0f));
+                float target_row  = (chip8.pc - 0x200) / 2.0f;
+                ImGui::SetScrollY(target_row * line_height - disasm_h * 0.5f);
             }
             last_pc = chip8.pc;
 
-            // create a clipper with the size of instructions_list
             ImGuiListClipper clipper;
-            clipper.Begin(instructions_list.size());
-
+            clipper.Begin((int)instructions_list.size());
             while(clipper.Step()){
                 for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++){
-                    //get instruction
-                    std::string instruction = instructions_list[row]; 
-
-                    // check if the current address is where the program counter is pointing to
+                    const std::string& instruction = instructions_list[row];
                     bool is_current_pc = (0x200 + (row * 2) == chip8.pc);
-
-                    // print instruction with pc highlighted
                     if(is_current_pc){
-                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> 0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
+                        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f),
+                            "-> 0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
                     }else{
                         ImGui::Text("0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
                     }
                 }
             }
-            
-            ImGui::EndChild();
+            clipper.End();
+
+            ImGui::EndChild(); // InstructionsList
             ImGui::Separator();
 
-            ImGui::BeginChild("HardwareControls", ImVec2(0, 0));
-            ImGui::Text("Hardware Controls");
+            // instruction controls pinned at the bottom of the left column
+            ImGui::BeginChild("InstrControls", ImVec2(0, 0), false);
+            ImGui::Text("Controls");
             ImGui::Separator();
             ImGui::Checkbox("Pause", &is_paused);
+            ImGui::SameLine();
             ImGui::BeginDisabled(!is_paused);
-            if(ImGui::Button("Step One")){
+            if(ImGui::Button("Step")){
                 chip8.cycle();
             }
             ImGui::EndDisabled();
 
-            ImGui::SetNextItemWidth(120);
+            ImGui::SetNextItemWidth(110);
             if(ImGui::InputInt("Cycles/Frame", &inst_per_frame)){
-                if(inst_per_frame < 1) inst_per_frame = 1;
+                if(inst_per_frame < 1)    inst_per_frame = 1;
                 if(inst_per_frame > 1000) inst_per_frame = 1000;
             }
 
@@ -575,134 +589,157 @@ int main(int argc, char* args[]){
                 chip8.loadROM(current_rom_path);
                 instructions_list = disassembler.disassemble(chip8.memory, chip8.rom_size);
             }
-
             ImGui::SameLine();
-
             if(ImGui::Button("Load ROM")){
                 show_rom_menu = true;
             }
 
-            for(int i = 0; i < 16; i++){
-                if(i % 4 != 0) ImGui::SameLine();
+            ImGui::EndChild(); // InstrControls
+            ImGui::EndChild(); // Instructions (left column)
 
-                int index = keypad_layout[i];
-                
-                if(chip8.keyboard[index]){
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-                }
-                
-                ImGui::Button(key_map[i], ImVec2(25, 25));
-                
-                if(chip8.keyboard[index]){
-                    ImGui::PopStyleColor();
-                }
-            }
-
-
-            ImGui::EndChild();
-
-            ImGui::EndChild();
             ImGui::SameLine();
 
-            ImGui::BeginChild("MidColumn", ImVec2(540, 0), false);
+            // mid column: [game | keypad] on top, memory view below
+            ImGui::BeginChild("MidColumn", ImVec2(col_mid_w, 0), false);
 
-            // define the area for the game
-            float game_area_width = 530.0f;
-            float game_are_height = 284.0f;
-            ImGui::BeginChild("GameScreen", ImVec2(0, game_are_height), true);
-            //ImGui::Text("Emulator Display");
-            
-            // calculate display size using available area to the game
-            float ch8_width = game_area_width - 12.0f;
-            float ch8_height = ch8_width / 2.0f;
-            
-            // send the SDL texture to ImGui as a image
-            ImGui::Image((ImTextureID)(intptr_t)texture, ImVec2(ch8_width, ch8_height));
-            ImGui::EndChild();
-            
-            //ImGui::BeginChild("Memory", ImVec2(256, 256), true);
-            // create collapsing header for memory
-            //if(ImGui::CollapsingHeader("Memory")){
-                ImGui::BeginChild("MemoryView", ImVec2(0, 200), true);
-                ImGui::Text("Memory");
-                // create list clipper to display memory
-                //ImGuiListClipper clipper;
-                // 16 bytes per line, 256 lines in total
-                clipper.Begin(256);
+            const ImGuiStyle& st = ImGui::GetStyle();
 
-                // the clipper will step for each line that is visible in the window
-                while(clipper.Step()){
-                    for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++){
-                        // get the base address for the current line
-                        int baseAddr = row * 16;
-                        // display address
-                        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "0x%04X: ", baseAddr);
+            // game takes 62% of mid width; keypad takes the rest
+            float game_panel_w   = col_mid_w * 0.62f;
+            float keypad_panel_w = col_mid_w - game_panel_w - st.ItemSpacing.x;
 
-                        // draw the 16 bytes of the current line
-                        for(int col = 0; col < 16; col++){
-                            ImGui::SameLine();
-                            
-                            if(baseAddr + col == chip8.pc || baseAddr + col == chip8.pc + 1){
-                                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%02X", chip8.memory[baseAddr + col]);
-                                
-                            }else{
-                                ImGui::Text("%02X", chip8.memory[baseAddr + col]);
-                            }
-                        }
-                        
+            // top row height is determined by the game image (strict 2:1 ratio)
+            float game_img_w = game_panel_w - st.WindowPadding.x * 2.0f;
+            float game_img_h = game_img_w / 2.0f;
+            float top_row_h  = game_img_h + st.WindowPadding.y * 2.0f;
+
+            // game screen
+            ImGui::BeginChild("GameScreen", ImVec2(game_panel_w, top_row_h), true,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+            {
+                float iw = ImGui::GetContentRegionAvail().x;
+                float ih = iw / 2.0f;
+                ImGui::Image((ImTextureID)(intptr_t)texture, ImVec2(iw, ih));
+            }
+            ImGui::EndChild(); // GameScreen
+
+            ImGui::SameLine();
+
+            // keypad (same height as game screen)
+            ImGui::BeginChild("KeypadPanel", ImVec2(keypad_panel_w, top_row_h), true);
+            ImGui::Text("Keypad");
+            ImGui::Separator();
+
+            {
+                float kw = ImGui::GetContentRegionAvail().x;
+                float key_sz = (kw - st.ItemSpacing.x * 3.0f) / 6.0f;
+
+                for(int i = 0; i < 16; i++){
+                    if(i % 4 != 0) ImGui::SameLine();
+                    int index = keypad_layout[i];
+
+                    if(chip8.keyboard[index]){
+                        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.15f, 0.80f, 0.25f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 1.00f, 0.35f, 1.0f));
                     }
-                    
+
+                    ImGui::Button(key_map[i], ImVec2(key_sz, key_sz));
+
+                    if(chip8.keyboard[index]){
+                        ImGui::PopStyleColor(2);
+                    }
                 }
-                ImGui::EndChild();
-            //}
-            
-            //ImGui::EndChild();
-            ImGui::EndChild();
+            }
+
+            ImGui::EndChild(); // KeypadPanel
+
+            // memory view fills all remaining vertical space
+            ImGui::BeginChild("MemoryView", ImVec2(0, 0), true);
+            ImGui::Text("Memory");
+            ImGui::Separator();
+
+            ImGuiListClipper mem_clipper;
+            mem_clipper.Begin(256);
+            while(mem_clipper.Step()){
+                for(int row = mem_clipper.DisplayStart; row < mem_clipper.DisplayEnd; row++){
+                    int baseAddr = row * 16;
+                    ImGui::TextColored(ImVec4(0.85f, 0.80f, 0.20f, 1.0f), "0x%04X:", baseAddr);
+                    for(int col = 0; col < 16; col++){
+                        ImGui::SameLine();
+                        if(baseAddr + col == chip8.pc || baseAddr + col == chip8.pc + 1){
+                            ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%02X", chip8.memory[baseAddr + col]);
+                        }else{
+                            ImGui::Text("%02X", chip8.memory[baseAddr + col]);
+                        }
+                    }
+                }
+            }
+            mem_clipper.End();
+
+            ImGui::EndChild(); // MemoryView
+            ImGui::EndChild(); // MidColumn
 
             ImGui::SameLine();
 
-            // hardware state area
-            ImGui::BeginChild("HardwareScreen", ImVec2(350, 0), true);
+            // right column: hardware state
+            ImGui::BeginChild("HardwareScreen", ImVec2(col_right, 0), true);
 
-            // special registers
-            ImGui::Text("Special registers");
-            ImGui::Text("PC: 0x%04X", chip8.pc);
-            ImGui::Text("Index Register: 0x%04X", chip8.I);
+            ImGui::Text("CPU State");
             ImGui::Separator();
-            
-            // time registers
+
+            ImGui::TextColored(ImVec4(0.50f, 0.80f, 1.00f, 1.0f), "PC:");
+            ImGui::SameLine();
+            ImGui::Text("0x%04X", chip8.pc);
+
+            ImGui::TextColored(ImVec4(0.50f, 0.80f, 1.00f, 1.0f), "I: ");
+            ImGui::SameLine();
+            ImGui::Text("0x%04X", chip8.I);
+
+            ImGui::Spacing();
             ImGui::Text("Timers");
-            ImGui::Text("Delay Timer: 0x%02X", chip8.delay_timer);
-            ImGui::Text("Sound Timer: 0x%02X", chip8.sound_timer);
             ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.50f, 0.80f, 1.00f, 1.0f), "Delay:");
+            ImGui::SameLine();
+            ImGui::Text("0x%02X (%d)", chip8.delay_timer, chip8.delay_timer);
 
-            // general purpose registers
+            ImGui::TextColored(ImVec4(0.50f, 0.80f, 1.00f, 1.0f), "Sound:");
+            ImGui::SameLine();
+            ImGui::Text("0x%02X (%d)", chip8.sound_timer, chip8.sound_timer);
+
+            ImGui::Spacing();
             ImGui::Text("V Registers");
+            ImGui::Separator();
+            // compact: single line per register, 4 per row (label: value)
             for(int i = 0; i < 16; i++){
-                ImGui::Text("V%X - 0x%02X", i, chip8.V[i]);
-
-                if((i + 1) % 4 != 0){
-                    ImGui::SameLine();
-                }
+                if(i % 4 != 0) ImGui::SameLine(0.0f, 14.0f);
+                ImGui::TextColored(ImVec4(0.45f, 0.65f, 0.90f, 1.0f), "V%X:", i);
+                ImGui::SameLine(0.0f, 3.0f);
+                ImGui::Text("%02X", chip8.V[i]);
             }
+
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.50f, 0.80f, 1.00f, 1.0f), "SP:");
+            ImGui::SameLine();
+            ImGui::Text("%d", chip8.sp);
+            ImGui::SameLine(0.0f, 12.0f);
+            ImGui::Text("Stack");
             ImGui::Separator();
 
-            // stack and sp
-            ImGui::Text("Stack Pointer: 0x%04X", chip8.sp);
-            ImGui::Text("Stack:");
+            // stack in a scrollable child so it never overflows
+            ImGui::BeginChild("StackView", ImVec2(0, 0), false);
             for(int i = 0; i < 16; i++){
                 if(i == chip8.sp){
-                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "0x%04X     (%d) <-", chip8.stack[i], i);
+                    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f),
+                        "[%02d] 0x%04X <--", i, chip8.stack[i]);
                 }else{
-                    ImGui::Text("0x%04X     (%d)", chip8.stack[i], i);
+                    ImGui::TextColored(ImVec4(0.45f, 0.52f, 0.65f, 1.0f),
+                        "[%02d] 0x%04X", i, chip8.stack[i]);
                 }
             }
-            ImGui::Separator();
+            ImGui::EndChild(); // StackView
 
-
-            ImGui::EndChild();
-            // close the debug window
-            ImGui::End();
+            ImGui::EndChild(); // HardwareScreen
+            ImGui::End(); // Debug Panel
         }
 
 
