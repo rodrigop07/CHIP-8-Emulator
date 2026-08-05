@@ -1,180 +1,297 @@
-﻿# Emulador CHIP-8
+# Emulador CHIP-8
 
-Um interpretador/emulador CHIP-8 escrito em C++ utilizando SDL2 para gráficos, áudio e entrada de dados. O emulador implementa o conjunto completo de instruções padrão do CHIP-8 e conta com um diálogo nativo do sistema operacional para seleção de ROMs.
+> Emulador completo do CHIP-8 escrito em C++, com depurador integrado, interface gráfica via Dear ImGui e suporte a áudio, tudo construído sobre SDL2.
+
+---
+
+## Índice
+
+- [Sobre o Projeto](#-sobre-o-projeto)
+- [Funcionalidades](#-funcionalidades)
+- [Arquitetura do CHIP-8](#-arquitetura-do-chip-8)
+- [Requisitos](#-requisitos)
+- [Instalação das Dependências](#-instalação-das-dependências)
+- [Como Compilar](#-como-compilar)
+- [Como Executar](#-como-executar)
+- [Controles](#-controles)
+- [Depurador](#-depurador)
+- [ROMs Incluídas](#-roms-incluídas)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+- [Tecnologias Utilizadas](#-tecnologias-utilizadas)
+- [Licença](#-licença)
+
+---
+
+## Sobre o Projeto
+
+O **CHIP-8** é uma linguagem de máquina interpretada desenvolvida na década de 1970 por Joseph Weisbecker, originalmente criada para facilitar a programação de jogos em microcomputadores como o COSMAC VIP e o Telmac 1800. Sua arquitetura simples — com apenas 35 opcodes — o torna um excelente ponto de partida para aprender desenvolvimento de emuladores.
+
+Este projeto implementa um emulador completo do CHIP-8 em **C++17**, com foco em:
+
+- **Fidelidade à especificação original** — todos os 35 opcodes implementados corretamente
+- **Experiência de desenvolvedor** — depurador visual integrado com disassembler, visualizador de memória e inspetor de estado da CPU
+- **Portabilidade** — suporte nativo a Linux e Windows (MinGW / MSYS2)
+
+---
 
 ## Funcionalidades
 
-- Implementação completa de todos os 35 opcodes padrão do CHIP-8
-- Display monocromático de 64×32 pixels renderizado via SDL2, escalado para 960×480
-- Som de bipe em onda quadrada (440 Hz) acionado pelo temporizador de som
-- Mapeamento do teclado hexadecimal de 16 teclas do CHIP-8 para o layout QWERTY
-- Diálogo de arquivo nativo do SO (via tinyfiledialogs) para seleção de ROM na inicialização e em tempo de execução
-- Troca de ROM em tempo real com `Ctrl Esquerdo`
-- CPU emulada a ~900 Hz (15 ciclos por frame de ~16 ms), temporizadores a 60 Hz
+### Emulação
 
-## Arquitetura
+- **CPU CHIP-8 completa** — 4 KB de RAM, 16 registradores de 8 bits (V0–VF), registrador de índice (I), contador de programa (PC), pilha de 16 níveis e timers de delay e som
+- **Display monocromático 64×32** com renderização via SDL2
+- **Teclado hexadecimal** de 16 teclas mapeado para o teclado do PC
+- **Geração de áudio** — onda quadrada de 440 Hz produzida via callback SDL2 enquanto o timer de som estiver ativo
+
+### Interface Gráfica (Dear ImGui)
+
+- **Menu principal** — exibido na inicialização
+- **Navegador de ROMs** — lista pesquisável das ROMs presentes na pasta `./roms/`; carregue com duplo clique ou seleção + botão "Load"
+- **Ajuste de velocidade** — ciclos por frame configuráveis de 1 a 1000 (padrão: 15)
+- **Botões de Reset e Load ROM** disponíveis a qualquer momento
+
+### Depurador Integrado
+
+Pressione `TAB` para abrir o painel de depuração em tela cheia:
+
+- **Disassembler** — lista todas as instruções da ROM com a instrução atual (PC) destacada
+- **Visualizador de memória** — dump hexadecimal dos 4 KB de espaço de endereçamento, com a instrução atual realçada em vermelho
+- **Painel de estado da CPU** — visão ao vivo de PC, I, V0–VF, SP e o conteúdo da pilha de chamadas
+- **Visualizador do teclado** — exibe o estado de cada uma das 16 teclas em tempo real
+- **Pause / Step** — pause a emulação e avance instrução por instrução
+- **Reset / Load ROM** — reinicie ou carregue uma nova ROM sem sair do emulador
+
+---
+
+## Arquitetura do CHIP-8
+
+| Componente              | Especificação                                   |
+|-------------------------|-------------------------------------------------|
+| Memória                 | 4096 bytes (4 KB)                               |
+| Registradores           | 16 registradores de 8 bits (V0–VF)             |
+| Registrador de índice   | 16 bits (I)                                     |
+| Contador de programa    | 16 bits (PC), início em `0x200`                |
+| Pilha                   | 16 níveis de 16 bits                            |
+| Timer de delay          | 8 bits, decrementado a 60 Hz                   |
+| Timer de som            | 8 bits, gera beep quando > 0                  |
+| Display                 | 64×32 pixels, 1 bit por pixel (monocromático)  |
+| Teclado                 | 16 teclas hexadecimais (0–F)                   |
+| Opcodes                 | 35 instruções de 16 bits                        |
+
+> **Nota:** Os programas CHIP-8 são carregados a partir do endereço `0x200` (512), pois os primeiros 512 bytes são reservados para a fonte de sprites embutida (caracteres 0–F).
+
+---
+
+## Requisitos
+
+| Dependência      | Versão mínima                         |
+|------------------|---------------------------------------|
+| Compilador C++   | C++17 ou superior (`g++` recomendado) |
+| SDL2             | 2.x                                   |
+| make             | Qualquer versão recente               |
+
+---
+
+## Instalação das Dependências
+
+### Linux (Debian / Ubuntu)
+
+```bash
+sudo apt update
+sudo apt install build-essential libsdl2-dev
+```
+
+### Linux (Arch / Manjaro)
+
+```bash
+sudo pacman -S base-devel sdl2
+```
+
+### Windows (MSYS2 / MinGW-w64)
+
+Abra o terminal **MSYS2 UCRT64** e execute:
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-SDL2 make
+```
+
+> O Makefile detecta automaticamente o sistema operacional e ajusta os caminhos de include e link para `C:/msys64/ucrt64`.
+
+---
+
+## Como Compilar
+
+Clone o repositório e execute `make` na raiz do projeto:
+
+```bash
+git clone https://github.com/rodrigop07/CHIP-8-Emulator.git
+cd CHIP-8-Emulator
+make
+```
+
+O executável `chip8` (ou `chip8.exe` no Windows) será gerado na raiz do projeto.
+
+### Alvos do Makefile
+
+| Alvo         | Descrição                               |
+|--------------|-----------------------------------------|
+| `make`       | Compila o emulador (alvo padrão)        |
+| `make run`   | Compila (se necessário) e executa       |
+| `make clean` | Remove todos os artefatos de compilação |
+
+### Flags de compilação
+
+O projeto é compilado com `-O3 -Wall -std=c++17`, garantindo otimizações de velocidade e avisos rigorosos do compilador.
+
+---
+
+## Como Executar
+
+```bash
+./chip8
+```
+
+Ao iniciar, o menu principal será exibido. Clique em **Load ROM** para abrir o navegador de ROMs e escolher um jogo da pasta `./roms/`.
+
+Você também pode compilar e executar em um único comando:
+
+```bash
+make run
+```
+
+---
+
+## Controles
+
+### Teclas do emulador
+
+| Tecla | Ação                               |
+|-------|------------------------------------|
+| `ESC` | Abre / fecha o menu principal      |
+| `TAB` | Abre / fecha o painel de depuração |
+
+### Mapeamento do teclado CHIP-8
+
+O teclado hexadecimal original do CHIP-8 (4×4) é mapeado para as seguintes teclas do teclado do PC:
+
+```
+Tecla CHIP-8   →   Tecla do PC
+────────────────────────────────
+  1  2  3  C   →   1  2  3  4
+  4  5  6  D   →   Q  W  E  R
+  7  8  9  E   →   A  S  D  F
+  A  0  B  F   →   Z  X  C  V
+```
+
+---
+
+## Depurador
+
+O depurador integrado é uma das principais características deste emulador. Para ativá-lo, pressione `TAB` durante a execução.
+
+### Painel de Disassembly
+
+Exibe todas as instruções da ROM traduzidas para mnemônicos legíveis (ex: `00E0 - CLS`, `6XNN - LD V0, 0x3C`). A instrução sendo executada é realçada automaticamente conforme o PC avança.
+
+### Visualizador de Memória
+
+Apresenta um dump hexadecimal completo dos 4096 bytes de memória, organizado em linhas de 16 bytes. O endereço da instrução atual é destacado em vermelho.
+
+### Estado da CPU
+
+Mostra em tempo real:
+- **PC** — Program Counter (endereço da próxima instrução)
+- **I** — Registrador de índice
+- **V0–VF** — Os 16 registradores de propósito geral
+- **SP** — Stack Pointer
+- **Stack** — Conteúdo atual da pilha de chamadas (endereços de retorno)
+
+### Keypad ao Vivo
+
+Visualização em grade 4×4 do teclado CHIP-8, com indicação visual de quais teclas estão pressionadas no momento.
+
+### Pause / Step
+
+- **Pause** — congela a emulação no estado atual
+- **Step** — avança exatamente um ciclo de CPU por vez (ideal para rastrear bugs em ROMs)
+
+---
+
+## ROMs Incluídas
+
+O projeto já inclui **24 ROMs clássicas** na pasta `./roms/`:
+
+| ROM                      | Descrição                                    |
+|--------------------------|----------------------------------------------|
+| `15PUZZLE`               | Quebra-cabeça deslizante de 15 peças         |
+| `BLINKY`                 | Clone do Pac-Man                             |
+| `BLITZ`                  | Jogo de bombardeiro aéreo                    |
+| `BRIX`                   | Clone do Breakout                            |
+| `CONNECT4`               | Jogo Connect Four (Liga 4)                   |
+| `GUESS`                  | Jogo de adivinhar números                    |
+| `HIDDEN`                 | Jogo de memória com cartas escondidas        |
+| `INVADERS`               | Clone do Space Invaders                      |
+| `KALEID`                 | Visualizador caleidoscópico                  |
+| `MAZE`                   | Gerador de labirintos aleatórios             |
+| `MERLIN`                 | Jogo de memória de sequências (Simon Says)   |
+| `MISSILE`                | Defesa anti-míssil                           |
+| `PONG`                   | Pong clássico (1 jogador vs CPU)             |
+| `PONG2`                  | Pong para 2 jogadores                        |
+| `PUZZLE`                 | Quebra-cabeça                                |
+| `SYZYGY`                 | Jogo de habilidade                           |
+| `TANK`                   | Jogo de tanque de guerra                     |
+| `TETRIS`                 | Tetris clássico                              |
+| `TICTAC.ch8`             | Jogo da velha                                |
+| `UFO`                    | Atirar em OVNIs                              |
+| `VBRIX`                  | Breakout vertical                            |
+| `VERS`                   | Jogo de cobra (Snake)                        |
+| `WIPEOFF`                | Breakout simplificado                        |
+| `ultimatetictactoe.ch8`  | Jogo da velha definitivo                     |
+
+---
+
+## Estrutura do Projeto
 
 ```
 CHIP-8-Emulator/
 ├── src/
-│   ├── imgui/              # Biblioteca de interface gráfica
-│   ├── chip8.cpp           # Núcleo do CHIP-8: CPU, memória, display, temporizadores
-│   └── main.cpp            # Janela SDL2, renderizador, áudio, loop de entrada
-├── roms/                   # Coleção com 24 ROMs clássicos do CHIP-8
-├── Makefile
-└── README.md
+│   ├── main.cpp            # Janela SDL2, áudio, interface ImGui e loop principal
+│   ├── chip8.cpp           # CPU CHIP-8: fetch / decode / execute (35 opcodes)
+│   ├── chip8.h             # Declaração da classe Chip8
+│   ├── disassembler.cpp    # Disassembler de ROMs CHIP-8
+│   ├── disassembler.h      # Declaração da classe Disassembler
+│   └── imgui/              # Dear ImGui (biblioteca vendorizada)
+├── roms/                   # 24 ROMs clássicas do CHIP-8
+├── Makefile                # Build multiplataforma (Linux e Windows)
+├── LICENSE                 # Licença do projeto
+└── README.md               # Este arquivo
 ```
 
-### Especificações de Hardware do CHIP-8 (emuladas)
+### Descrição dos arquivos principais
 
-| Componente          | Detalhe                                      |
-|---------------------|----------------------------------------------|
-| RAM                 | 4 KB (4096 bytes)                            |
-| Registers           | 16 × 8-bit de uso geral (V0–VF)              |
-| Index Register      | 16-bit (I)                                   |
-| Program Counter     | 16-bit, inicia em `0x200`                    |
-| Stack               | Stack de sub-rotinas com 16 níveis           |
-| Display             | 64 × 32 pixels, monocromático                |
-| Keyboard            | Teclado hexadecimal de 16 teclas             |
-| Timers              | Delay e Sound, ambos 8-bit a 60 Hz           |
-| Font                | Conjunto de sprites embutido (0–F), armazenado em `0x050`–`0x09F` |
+| Arquivo                | Responsabilidade                                                                  |
+|------------------------|-----------------------------------------------------------------------------------|
+| `src/chip8.h`          | Define a classe `Chip8` com todos os componentes de hardware do emulador          |
+| `src/chip8.cpp`        | Implementa `loadROM()`, `reset()` e `cycle()` — o núcleo de emulação             |
+| `src/disassembler.cpp` | Converte opcodes binários em mnemônicos legíveis para o painel de debug           |
+| `src/main.cpp`         | Gerencia SDL2 (vídeo + áudio), Dear ImGui (UI) e o loop principal de emulação    |
+| `Makefile`             | Detecta o SO automaticamente e configura compilação para Linux ou Windows         |
 
-## Requisitos
+---
 
-| Dependência | Versão   |
-|-------------|----------|
-| Compilador C++ (g++) | C++17 ou superior |
-| SDL2        | 2.x      |
-| MSYS2 / MinGW (Windows) | Toolchain UCRT64 |
+## Tecnologias Utilizadas
 
-### Instalando o SDL2
+| Tecnologia     | Uso                                               |
+|----------------|---------------------------------------------------|
+| **C++17**      | Linguagem principal                               |
+| **SDL2**       | Renderização de vídeo, entrada de teclado e áudio |
+| **Dear ImGui** | Interface gráfica do depurador e menus            |
+| **Make**       | Sistema de build multiplataforma                  |
 
-**Windows (MSYS2 UCRT64):**
-```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL2
-```
-
-**Linux (Debian/Ubuntu):**
-```bash
-sudo apt install libsdl2-dev
-```
-
-## Compilação
-
-```bash
-# Clone o repositório
-git clone https://github.com/rodrigop07/CHIP-8-Emulator.git
-cd CHIP-8-Emulator
-
-# Compilar
-make
-
-# Executar
-make run
-```
-
-> **Nota para Windows:** O Makefile espera os headers e bibliotecas do SDL2 em `C:/msys64/ucrt64`. Ajuste `INCLUDE_PATHS` e `LIBRARY_PATHS` no `Makefile` caso sua instalação esteja em outro diretório.
-
-## Executando
-
-Ao iniciar, um diálogo de arquivo nativo será aberto — navegue até a pasta `roms/` e selecione qualquer ROM.
-
-```bash
-./chip8        # Linux
-chip8.exe      # Windows
-```
-
-## Mapeamento de Teclado
-
-O CHIP-8 original utilizava um teclado hexadecimal de 16 teclas. Este emulador o mapeia para as seguintes teclas QWERTY:
-
-```
-Teclado CHIP-8      Mapeamento no Teclado
-┌───┬───┬───┬───┐   ┌───┬───┬───┬───┐
-│ 1 │ 2 │ 3 │ C │   │ 1 │ 2 │ 3 │ 4 │
-├───┼───┼───┼───┤   ├───┼───┼───┼───┤
-│ 4 │ 5 │ 6 │ D │   │ Q │ W │ E │ R │
-├───┼───┼───┼───┤   ├───┼───┼───┼───┤
-│ 7 │ 8 │ 9 │ E │   │ A │ S │ D │ F │
-├───┼───┼───┼───┤   ├───┼───┼───┼───┤
-│ A │ 0 │ B │ F │   │ Z │ X │ C │ V │
-└───┴───┴───┴───┘   └───┴───┴───┴───┘
-```
-
-| Tecla Especial   | Ação                                      |
-|------------------|-------------------------------------------|
-| `Ctrl Esquerdo`  | Abrir diálogo de seleção de ROM (hot-swap) |
-
-## ROMs Incluídos
-
-A pasta `roms/` contém 24 programas clássicos de domínio público para CHIP-8:
-
-| ROM               | Descrição                    |
-|-------------------|------------------------------|
-| `PONG`            | Pong clássico (1 jogador)    |
-| `PONG2`           | Pong (2 jogadores)           |
-| `TETRIS`          | Clone de Tetris              |
-| `INVADERS`        | Clone de Space Invaders      |
-| `BLINKY`          | Clone de Pac-Man             |
-| `BRIX`            | Clone de Breakout            |
-| `TANK`            | Jogo de batalha de tanques   |
-| `CONNECT4`        | Conecta 4                    |
-| `TICTAC`          | Jogo da velha                |
-| `15PUZZLE`        | Quebra-cabeça deslizante     |
-| `MAZE`            | Gerador de labirintos        |
-| `KALEID`          | Demo caleidoscópio           |
-| `MERLIN`          | Clone de Genius (Simon Says) |
-| `GUESS`           | Jogo de adivinhar números    |
-| `MISSILE`         | Clone de Missile Command     |
-| `UFO`             | Atirador de OVNIs            |
-| `VERS`            | Jogo de cobra                |
-| `WIPEOFF`         | Variante de Breakout         |
-| `VBRIX`           | Breakout vertical            |
-| `BLITZ`           | Jogo de bombardeio           |
-| `SYZYGY`          | Jogo de puzzle               |
-| `HIDDEN`          | Jogo de cartas ocultas       |
-| `PUZZLE`          | Jogo de puzzle               |
-| `ultimatetictactoe` | Jogo da velha supremo      |
-
-## Opcodes Implementados
-
-| Opcode   | Mnemônico        | Descrição                                                |
-|----------|------------------|----------------------------------------------------------|
-| `00E0`   | CLS              | Limpa o display                                          |
-| `00EE`   | RET              | Retorna de sub-rotina                                    |
-| `1NNN`   | JP addr          | Salta para o endereço NNN                                |
-| `2NNN`   | CALL addr        | Chama sub-rotina em NNN                                  |
-| `3xkk`   | SE Vx, byte      | Pula próxima instrução se Vx == kk                       |
-| `4xkk`   | SNE Vx, byte     | Pula próxima instrução se Vx != kk                       |
-| `5xy0`   | SE Vx, Vy        | Pula próxima instrução se Vx == Vy                       |
-| `6xkk`   | LD Vx, byte      | Carrega kk em Vx                                         |
-| `7xkk`   | ADD Vx, byte     | Adiciona kk a Vx                                         |
-| `8xy0`   | LD Vx, Vy        | Define Vx = Vy                                           |
-| `8xy1`   | OR Vx, Vy        | Define Vx = Vx OR Vy                                     |
-| `8xy2`   | AND Vx, Vy       | Define Vx = Vx AND Vy                                    |
-| `8xy3`   | XOR Vx, Vy       | Define Vx = Vx XOR Vy                                    |
-| `8xy4`   | ADD Vx, Vy       | Define Vx = Vx + Vy, VF = carry                          |
-| `8xy5`   | SUB Vx, Vy       | Define Vx = Vx - Vy, VF = NOT borrow                    |
-| `8xy6`   | SHR Vx           | Desloca Vx à direita, VF = LSB                           |
-| `8xy7`   | SUBN Vx, Vy      | Define Vx = Vy - Vx, VF = NOT borrow                    |
-| `8xyE`   | SHL Vx           | Desloca Vx à esquerda, VF = MSB                          |
-| `9xy0`   | SNE Vx, Vy       | Pula próxima instrução se Vx != Vy                       |
-| `Annn`   | LD I, addr       | Define I = nnn                                           |
-| `Bnnn`   | JP V0, addr      | Salta para nnn + V0                                      |
-| `Cxkk`   | RND Vx, byte     | Define Vx = byte aleatório AND kk                        |
-| `Dxyn`   | DRW Vx, Vy, n    | Desenha sprite de n bytes em (Vx, Vy), VF = colisão      |
-| `Ex9E`   | SKP Vx           | Pula próxima instrução se a tecla Vx estiver pressionada |
-| `ExA1`   | SKNP Vx          | Pula próxima instrução se a tecla Vx não estiver pressionada |
-| `Fx07`   | LD Vx, DT        | Define Vx = valor do temporizador de delay               |
-| `Fx0A`   | LD Vx, K         | Aguarda pressionamento de tecla e armazena em Vx         |
-| `Fx15`   | LD DT, Vx        | Define temporizador de delay = Vx                        |
-| `Fx18`   | LD ST, Vx        | Define temporizador de som = Vx                          |
-| `Fx1E`   | ADD I, Vx        | Define I = I + Vx                                        |
-| `Fx29`   | LD F, Vx         | Define I = localização do sprite do dígito Vx            |
-| `Fx33`   | LD B, Vx         | Armazena BCD de Vx em I, I+1 e I+2                       |
-| `Fx55`   | LD [I], Vx       | Armazena V0–Vx na memória a partir de I                  |
-| `Fx65`   | LD Vx, [I]       | Lê V0–Vx da memória a partir de I                        |
+---
 
 ## Licença
 
 Este projeto está licenciado sob a Licença MIT — veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+---
