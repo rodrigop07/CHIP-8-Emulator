@@ -553,11 +553,13 @@ int main(int argc, char* args[]){
                 for(int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++){
                     const std::string& instruction = instructions_list[row];
                     bool is_current_pc = (0x200 + (row * 2) == chip8.pc);
+
+                    ImGui::TextColored(ImVec4(0.85f, 0.80f, 0.20f, 1.0f), "0x%04X:", 0x200 + (row * 2));
+                    ImGui::SameLine(0, 5.0f);
                     if(is_current_pc){
-                        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f),
-                            "-> 0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
+                        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "%s <--", instruction.c_str());
                     }else{
-                        ImGui::Text("0x%04X: %s", 0x200 + (row * 2), instruction.c_str());
+                        ImGui::Text("%s", instruction.c_str());
                     }
                 }
             }
@@ -659,19 +661,39 @@ int main(int argc, char* args[]){
             ImGui::Separator();
 
             ImGuiListClipper mem_clipper;
+            // create a buffer to store ascii representation of memory
+            char ascii_dump[17];
+            // terminate the buffer
+            ascii_dump[16] = '\0';
+            
             mem_clipper.Begin(256);
             while(mem_clipper.Step()){
                 for(int row = mem_clipper.DisplayStart; row < mem_clipper.DisplayEnd; row++){
                     int baseAddr = row * 16;
                     ImGui::TextColored(ImVec4(0.85f, 0.80f, 0.20f, 1.0f), "0x%04X:", baseAddr);
+                    // print hex values
                     for(int col = 0; col < 16; col++){
                         ImGui::SameLine();
+                        uint8_t byte = chip8.memory[baseAddr + col];
+                        
+                        // check if the byte is the current pc or next instruction
                         if(baseAddr + col == chip8.pc || baseAddr + col == chip8.pc + 1){
-                            ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%02X", chip8.memory[baseAddr + col]);
+                            ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%02X", byte);
                         }else{
-                            ImGui::Text("%02X", chip8.memory[baseAddr + col]);
+                            ImGui::Text("%02X", byte);
+                        }
+
+                        // populate ascii representation of memory
+                        if(byte >= 32 && byte <= 126){
+                            ascii_dump[col] = (char)byte;
+                        }else{
+                            ascii_dump[col] = '.';
                         }
                     }
+                    
+                    // print ascii representation of memory
+                    ImGui::SameLine();
+                    ImGui::Text("| %s |", ascii_dump);
                 }
             }
             mem_clipper.End();
