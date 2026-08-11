@@ -1,4 +1,6 @@
 # Emulador CHIP-8
+![Static Badge](https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
 
 > Emulador completo do CHIP-8 escrito em C++, com depurador integrado, interface gráfica via Dear ImGui e suporte a áudio, tudo construído sobre SDL2.
 
